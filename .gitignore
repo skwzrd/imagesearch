@@ -1,0 +1,7 @@
+CLIP/
+__pycache__/
+venv/
+*.db
+*.png
+*.jpeg
+*.jpg

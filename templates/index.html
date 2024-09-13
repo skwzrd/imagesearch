@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Search</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Image Search</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="alert alert-success">
+                    {% for category, message in messages %}
+                        <p>{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" enctype="multipart/form-data" action="/">
+            {{form.hidden_tag()}}
+            <div class="form-group">
+                <label for="text">Search by Text:</label>
+                {{form.text(class_='form-control', placeholder='Enter your query here')}}
+            </div>
+            <div class="form-group">
+                <label for="file">Search by Image:</label>
+                {{form.file(class_='form-control-file')}}
+            </div>
+            {{form.search(class_='btn-primary')}}
+        </form>
+
+        {% if results %}
+            <h3>Results</h3>
+            <div class="gallery">
+                {% for path, score, exif_summary, ocr_text in results %}
+                <div class="gallery_item">
+                    <img src="{{ url_for('serve', filename=path) }}" class="img-fluid" alt="matching_image">
+                    <div class="metadata">{{ path|basename }}</div>
+                    <div class="metadata">CLIP: {{ score|round(1) }}</div>
+                    <div class="metadata">EXIF: {{ exif_summary }}</div>
+                    <div class="metadata">OCR: {{ ocr_text }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
