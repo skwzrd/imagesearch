@@ -174,7 +174,7 @@ def load_images_and_store_in_db(image_dir: str, processor: ImageProcessor):
         for root, _, files in os.walk(image_dir):
             for file in files:
                 file_i += 1
-                bar.update(file_i)
+                bar.update(file_i - 1)
 
                 if not file.lower().endswith(CONSTS.valid_extensions):
                     continue
