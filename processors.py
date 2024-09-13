@@ -165,11 +165,11 @@ def store_features_in_db(cursor: Cursor, image_id: int, fs_img: FSProcessor, fea
 
 def load_images_and_store_in_db(image_dir: str, processor: ImageProcessor):
     files_found = count_image_files(image_dir)
-    files_found = min(files_found, CONSTS.limit) if CONSTS.limit else files_found
+    files_count = min(files_found, CONSTS.limit) if CONSTS.limit else files_found
 
     conn: Connection = get_db_conn()
     cursor: Cursor = conn.cursor()
-    with progressbar.ProgressBar(max_value=files_found) as bar:
+    with progressbar.ProgressBar(max_value=files_count) as bar:
         file_i = 0
         for root, _, files in os.walk(image_dir):
             for file in files:
@@ -182,10 +182,10 @@ def load_images_and_store_in_db(image_dir: str, processor: ImageProcessor):
                 image_path = os.path.join(root, file)
                 processor.process_image(cursor, image_path)
 
-                if CONSTS.limit and file_i > CONSTS.limit:
+                if file_i > files_count:
                     break
 
-            if CONSTS.limit and file_i > CONSTS.limit:
+            if file_i > files_count:
                     break
 
     conn.commit()
