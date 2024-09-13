@@ -1,6 +1,9 @@
 # EclipseImg
 
-Get your venv up with and install the `requirements.txt`. Consider following the guides on the dependency repos.
+Get your venv up with and install the `requirements.txt`.
+- Run `python3.12 -m pip install git+https://github.com/openai/CLIP.git` to install CLIP.
+- Run `python3.12 -m pip install -r requirements.txt`
+- If you don't have nvidia drivers installed, you can use `sudo ubuntu-drivers autoinstall` and reboot.
 
 Set your configs in `configs.py`.
 

@@ -10,4 +10,5 @@ pillow
 progressbar2
 packaging
 doctr
-openclip
+flask-wtf
+# python3.12 -m pip install git+https://github.com/openai/CLIP.git

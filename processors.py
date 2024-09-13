@@ -165,6 +165,7 @@ def store_features_in_db(cursor: Cursor, image_id: int, fs_img: FSProcessor, fea
 
 def load_images_and_store_in_db(image_dir: str, processor: ImageProcessor):
     files_found = count_image_files(image_dir)
+    files_found = min(files_found, CONSTS.limit) if CONSTS.limit else files_found
 
     conn: Connection = get_db_conn()
     cursor: Cursor = conn.cursor()

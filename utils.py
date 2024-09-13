@@ -2,6 +2,7 @@ import hashlib
 import subprocess
 from datetime import datetime
 from functools import cache
+from configs import CONSTS
 
 
 def get_current_datetime_w_us_str():
@@ -26,7 +27,7 @@ def count_image_files(image_dir):
         text=True,
         check=True
     )
-    file_count = len(result.stdout.splitlines())
+    file_count = len([f for f in result.stdout.splitlines() if f[-10:].strip().lower().endswith(CONSTS.valid_extensions)])
     return file_count
 
 
