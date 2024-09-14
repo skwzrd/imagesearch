@@ -182,10 +182,10 @@ def load_images_and_store_in_db(image_dir: str, processor: ImageProcessor):
                 image_path = os.path.join(root, file)
                 processor.process_image(cursor, image_path)
 
-                if file_i > files_count:
+                if file_i >= files_count:
                     break
 
-            if file_i > files_count:
+            if file_i >= files_count:
                     break
 
     conn.commit()
