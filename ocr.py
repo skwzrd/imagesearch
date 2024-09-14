@@ -77,6 +77,7 @@ class OCRTerreract(OCRBase):
         text = pytesseract.image_to_string(image_path, config=self.config, timeout=20)
         return text
 
+
 class OCRRobertKnight(OCRBase):
     """
     curl https://sh.rustup.rs -sSf | sh

@@ -1,8 +1,9 @@
 import os
 import pickle
 from datetime import datetime
+from pathlib import Path
 from sqlite3 import Connection, Cursor
-from typing import Dict
+from typing import Dict, Generator
 
 import progressbar
 import torch
@@ -24,7 +25,6 @@ if CONSTS.clip:
     import clip
 
 
-
 class OCRProcessor:
     def __init__(self, ocr_type) -> None:
         self.ocr_type = ocr_type
@@ -38,7 +38,7 @@ class CLIPProcessor:
     def __init__(self):
         print('Loading CLIP Model...')
         self.model, self.preprocess = clip.load("ViT-B/32", device=CONSTS.device)
-        print('OK')
+        print('Finished')
 
     def process(self, image):
         with torch.no_grad():
@@ -153,7 +153,12 @@ def store_features_in_db(cursor: Cursor, image_id: int, fs_img: FSProcessor, fea
         insert_feature(cursor, image_id, 'clip', {'features': pickle.dumps(features['clip'].cpu().numpy())})
 
 
+def get_image_paths(root_dir) -> Generator:
+    return (str(p) for p in Path(root_dir).rglob('*') if p.suffix.lower() in CONSTS.valid_extensions)
+
+
 def load_images_and_store_in_db(image_dir: str, processor: ImageProcessor):
+    file_paths = get_image_paths(image_dir)
     files_found = count_image_files(image_dir)
     files_count = min(files_found, CONSTS.limit) if CONSTS.limit else files_found
 
@@ -161,22 +166,14 @@ def load_images_and_store_in_db(image_dir: str, processor: ImageProcessor):
     cursor: Cursor = conn.cursor()
     with progressbar.ProgressBar(max_value=files_count) as bar:
         file_i = 0
-        for root, _, files in os.walk(image_dir):
-            for file in files:
-                file_i += 1
-                bar.update(file_i - 1)
+        for file_path in file_paths:
+            file_i += 1
+            bar.update(file_i - 1)
 
-                if not file.lower().endswith(CONSTS.valid_extensions):
-                    continue
-
-                image_path = os.path.join(root, file)
-                processor.process_image(cursor, image_path)
-
-                if file_i >= files_count:
-                    break
+            processor.process_image(cursor, file_path)
 
             if file_i >= files_count:
-                    break
+                break
 
     conn.commit()
     cursor.close()

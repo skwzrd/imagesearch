@@ -37,7 +37,7 @@ def row_factory(cursor, data):
 
 
 def get_db_conn():
-    conn = sqlite3.connect(CONSTS.db_path)
+    conn = sqlite3.connect(CONSTS.db_path, detect_types=sqlite3.PARSE_DECLTYPES)
     conn.row_factory = row_factory
     return conn
 
