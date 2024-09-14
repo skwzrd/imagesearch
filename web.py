@@ -16,8 +16,9 @@ from configs import CONSTS
 from db import query_db
 from db_api import get_sql_cols_from_d, get_sql_markers_from_d
 from forms import SearchForm
+from search import CLIPSearch
 from utils import get_current_datetime, get_current_datetime_w_us_str
-from web_search import CLIPSearch
+
 
 def basename(path):
     return os.path.basename(path)

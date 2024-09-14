@@ -6,3 +6,4 @@ venv/
 *.jpeg
 *.jpg
 !preview.png
+configs.py

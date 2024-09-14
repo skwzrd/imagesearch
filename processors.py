@@ -17,31 +17,21 @@ from db_api import (
     get_sql_markers_from_d,
     init_db_all
 )
+from ocr import OCRBase, OCRDoctr, OCRRobertKnight, OCRTerreract
 from utils import count_image_files, get_dt_format, get_sha256
 
 if CONSTS.clip:
     import clip
 
-if CONSTS.ocr:
-    from typing import List
-
-    from doctr.io import DocumentFile
-    from doctr.io.elements import Page
-    from doctr.models import ocr_predictor
-    from doctr.models.predictor.pytorch import OCRPredictor
-    from numpy import ndarray
 
 
 class OCRProcessor:
-    def __init__(self):
-        print('Loading OCR Model...')
-        self.model: OCRPredictor = ocr_predictor(det_arch='db_resnet50', reco_arch='crnn_vgg16_bn', pretrained=True)
-        print('OK')
-
+    def __init__(self, ocr_type) -> None:
+        self.ocr_type = ocr_type
+        self.obj: OCRBase = {'ocrs': OCRRobertKnight, 'tesseract': OCRTerreract, 'doctr': OCRDoctr}[self.ocr_type]()
+    
     def process(self, image_path):
-        doc: List[ndarray] = DocumentFile.from_images(image_path)
-        result: Page = self.model(doc)
-        return result.render()
+        return self.obj.process(image_path)
 
 
 class CLIPProcessor:
@@ -196,7 +186,7 @@ def load_images_and_store_in_db(image_dir: str, processor: ImageProcessor):
 if __name__ == '__main__':
     init_db_all()
 
-    ocr_processor = OCRProcessor() if CONSTS.ocr else None
+    ocr_processor = OCRProcessor(CONSTS.ocr_type) if CONSTS.ocr else None
     clip_processor = CLIPProcessor() if CONSTS.clip else None
     exif_processor = EXIFProcessor() if CONSTS.exif else None
 

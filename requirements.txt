@@ -9,6 +9,11 @@ flask
 pillow
 progressbar2
 packaging
-doctr
 flask-wtf
+
+## embeddings
 # python3.12 -m pip install git+https://github.com/openai/CLIP.git
+
+## OCR
+# doctr
+# pytesseract

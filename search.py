@@ -13,7 +13,7 @@ class CLIPSearch:
     def __init__(self):
         print('Loading CLIP Model...')
         self.model, self.preprocess = clip.load("ViT-B/32", device=CONSTS.device)
-        print('OK')
+        print('Finished!')
 
 
     @cache
@@ -52,9 +52,7 @@ class CLIPSearch:
 
 
     def search_with_image(self, query_image_path):
-        query_image = (
-            self.preprocess(Image.open(query_image_path)).unsqueeze(0).to(CONSTS.device)
-        )
+        query_image = self.preprocess(Image.open(query_image_path)).unsqueeze(0).to(CONSTS.device)
         with torch.no_grad():
             image_features = self.model.encode_image(query_image).float()
             return self.get_n_results(image_features)
