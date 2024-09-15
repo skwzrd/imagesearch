@@ -181,6 +181,9 @@ def load_images_and_store_in_db(root_image_folder: str, processor: ImageProcesso
             if file_i >= files_count:
                 break
 
+            if file_i % 320 == 0:
+                conn.commit() # intermittent commits every ~2 min with all processors on.
+
     conn.commit()
     cursor.close()
     conn.close()
