@@ -181,8 +181,10 @@ def load_images_and_store_in_db(root_image_folder: str, processor: ImageProcesso
             if file_i >= files_count:
                 break
 
-            if file_i % 320 == 0:
-                conn.commit() # intermittent commits every ~2 min with all processors on.
+            if CONSTS.ocr and file_i % 320 == 0:
+                conn.commit() # ocr is computationally expensive.
+            elif not CONSTS.ocr and (CONSTS.clip or CONSTS.exif) and file_i % 2000 == 0:
+                conn.commit()
 
     conn.commit()
     cursor.close()
