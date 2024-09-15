@@ -176,7 +176,10 @@ def load_images_and_store_in_db(root_image_folder: str, processor: ImageProcesso
             file_i += 1
             bar.update(file_i - 1)
 
-            processor.process_image(cursor, file_path)
+            try:
+                processor.process_image(cursor, file_path)
+            except Exception as e:
+                print(e) # OSError: image file is truncated (0 bytes not processed)
 
             if file_i >= files_count:
                 break
