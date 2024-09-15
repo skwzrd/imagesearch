@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlite3 import Connection, Cursor
 from typing import Dict, Generator
 
-import progressbar
+import tqdm
 import torch
 from PIL import Image
 from werkzeug.utils import secure_filename
@@ -22,14 +22,15 @@ from db_api import (
     get_exif_tag_d,
     get_sql_cols_from_d,
     get_sql_markers_from_d,
-    init_db_all
+    init_db_all, 
+    query_db
 )
 from ocr import OCRBase, OCRDoctr, OCRRobertKnight, OCRTerreract
 from utils import count_image_files, get_dt_format, get_sha256
 
 if CONSTS.clip:
     import clip
-
+from time import perf_counter
 
 class OCRProcessor:
     def __init__(self, ocr_type) -> None:
@@ -89,24 +90,29 @@ class ImageProcessor:
         self.clip_processor: CLIPProcessor = clip_processor
         self.exif_processor: EXIFProcessor = exif_processor
 
+        self.sha256_digest_to_image_id: dict = {row.sha256_digest: row.image_id for row in query_db("""SELECT image_id, sha256_digest FROM image;""")}
+        
+        print('Setting up sets.')
+        self.clip_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM clip;""")} if CONSTS.clip else None
+        self.exif_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM exif;""")} if CONSTS.exif else None
+        self.ocr_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM ocr;""")} if CONSTS.ocr else None
+        print('Finished.')
+
     def process_image(self, cursor: Cursor, image_path: str):
         fs_img = FSProcessor(image_path)
 
-        image_id = None
-        row = cursor.execute("SELECT image_id, filename_secure FROM image WHERE sha256_digest = ?;", (fs_img.sha256_digest,)).fetchone()
-        if row and row.image_id:
-            image_id = row.image_id
-
+        image_id = self.sha256_digest_to_image_id.get(fs_img.sha256_digest, None)
         features = {}
-        if self.exif_processor and image_path.endswith(exif_valid_extensions) and not (image_id or image_id_exists_in_table(cursor, 'exif', image_id)):
+
+        if self.exif_processor and (image_id not in self.exif_image_ids):
             features['exif'] = self.exif_processor.process(fs_img.img)
 
-        if self.ocr_processor and image_path.endswith(ocr_valid_extensions) and not (image_id or image_id_exists_in_table(cursor, 'ocr', image_id)):
+        if self.ocr_processor and (image_id not in self.ocr_image_ids):
             features['ocr'] = self.ocr_processor.process(image_path)
 
-        if self.clip_processor and image_path.endswith(clip_valid_extensions) and not (image_id or image_id_exists_in_table(cursor, 'clip', image_id)):
-            image = self.clip_processor.preprocess(fs_img.img).unsqueeze(0).to(CONSTS.device)
-            features['clip'] = self.clip_processor.process(image)
+        if self.clip_processor and (image_id not in self.clip_image_ids):
+            image = self.clip_processor.preprocess(fs_img.img).unsqueeze(0).to(CONSTS.device) # 0.08s
+            features['clip'] = self.clip_processor.process(image) # 0.03s
 
         if features:
             store_features_in_db(cursor, image_id, fs_img, features)
@@ -170,24 +176,20 @@ def load_images_and_store_in_db(root_image_folder: str, processor: ImageProcesso
 
     conn: Connection = get_db_conn()
     cursor: Cursor = conn.cursor()
-    with progressbar.ProgressBar(max_value=files_count) as bar:
-        file_i = 0
-        for file_path in file_paths:
-            file_i += 1
-            bar.update(file_i - 1)
+    for i, file_path in enumerate(tqdm.tqdm(file_paths, total=files_count)):
 
-            try:
-                processor.process_image(cursor, file_path)
-            except Exception as e:
-                pass
+        try:
+            processor.process_image(cursor, file_path)
+        except Exception as e:
+            print(e)
 
-            if file_i >= files_count:
-                break
+        if i >= files_count:
+            break
 
-            if CONSTS.ocr and file_i % 320 == 0:
-                conn.commit() # ocr is computationally expensive.
-            elif not CONSTS.ocr and (CONSTS.clip or CONSTS.exif) and file_i % 2000 == 0:
-                conn.commit()
+        if CONSTS.ocr and i % 320 == 0:
+            conn.commit() # ocr is computationally expensive.
+        elif not CONSTS.ocr and (CONSTS.clip or CONSTS.exif) and i % 2000 == 0:
+            conn.commit()
 
     conn.commit()
     cursor.close()

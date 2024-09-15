@@ -7,7 +7,6 @@ huggingface_hub
 timm
 flask
 pillow
-progressbar2
 packaging
 flask-wtf
 
