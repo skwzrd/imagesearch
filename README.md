@@ -27,7 +27,7 @@ Need help choosing? See [https://neetventures.com/post/50](https://neetventures.
 
 ## Performance
 
-My server (see below) does 160 images/minute with EXIF, CLIP, and OCR ([https://github.com/robertknight/ocrs](https://github.com/robertknight/ocrs)) engaged.
+My server (see below) does 160 images/second with EXIF, CLIP, and OCR ([https://github.com/robertknight/ocrs](https://github.com/robertknight/ocrs)) engaged.
 
 
 ## Hardware Requirements
