@@ -16,17 +16,19 @@ from configs import CONSTS
 from db import query_db
 from db_api import get_sql_cols_from_d, get_sql_markers_from_d
 from forms import SearchForm
-from search import CLIPSearch
+from search import CLIPSearch, search_exif, search_ocr
 from utils import get_current_datetime, get_current_datetime_w_us_str
 
 
 def basename(path):
     return os.path.basename(path)
 
+
 def create_app():
     app = Flask(__name__)
-    app.secret_key = CONSTS.secret
-    app.config['UPLOAD_FOLDER'] = CONSTS.upload_folder
+    app.secret_key = CONSTS.flask_secret
+    app.config['UPLOAD_FOLDER'] = CONSTS.UPLOAD_FOLDER
+    app.config['MAX_CONTENT_LENGTH'] = CONSTS.MAX_CONTENT_LENGTH
     app.jinja_env.filters['basename'] = basename
     return app
 
@@ -88,29 +90,38 @@ def index():
     results = []
 
     if form.validate_on_submit():
-        text = form.text.data
+        text_clip = form.clip.data
+        text_exif = form.exif.data
+        text_ocr = form.ocr.data
         file = form.file.data
 
-        if text or file:
-            text, filepath = save_text_or_file(text, file)
-
-        if text:
-            results = clip_search.search_with_text(text)
-            flash(f"Showing results for '{text}'.", 'success')
-
-        elif file and file.filename.endswith(CONSTS.valid_extensions):
+        if file:
+            text_clip, filepath = save_text_or_file(text_clip, file)
             results = clip_search.search_with_image(filepath)
-            flash(f"Showing results for image.", 'success')
+            flash(f"Showing results for the image.", 'success')
+
+        else:
+            if text_clip:
+                results = clip_search.search_with_text(text_clip)
+            elif text_exif:
+                results = search_exif(text_exif)
+            elif text_ocr:
+                results = search_ocr(text_ocr)
+            else:
+                flash("No valid search criteria provided.", 'warning')
+
+            if not results:
+                flash('No results found', 'warning')
 
         form.data.clear()
 
-    return render_template('index.html', form=form, results=results)
+    return render_template('index.html', form=form, results=results, limit=CONSTS.processor_file_limit)
 
 
 @app.route('/serve/<path:filename>')
 def serve(filename: str):
     file_path = os.path.abspath(os.path.join('/', filename))
-    if file_path.startswith(CONSTS.image_dir) and os.path.isfile(file_path):
+    if file_path.startswith(CONSTS.root_image_folder) and os.path.isfile(file_path):
         return send_file(file_path)
     abort(404)
 

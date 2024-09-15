@@ -11,6 +11,12 @@ from PIL import Image
 from werkzeug.utils import secure_filename
 
 from configs import CONSTS
+from consts import (
+    clip_valid_extensions,
+    exif_valid_extensions,
+    ocr_valid_extensions,
+    valid_extensions
+)
 from db import get_db_conn
 from db_api import (
     get_exif_tag_d,
@@ -92,13 +98,13 @@ class ImageProcessor:
             image_id = row.image_id
 
         features = {}
-        if self.exif_processor and not (image_id or image_id_exists_in_table(cursor, 'exif', image_id)):
+        if self.exif_processor and image_path.endswith(exif_valid_extensions) and not (image_id or image_id_exists_in_table(cursor, 'exif', image_id)):
             features['exif'] = self.exif_processor.process(fs_img.img)
 
-        if self.ocr_processor and not (image_id or image_id_exists_in_table(cursor, 'ocr', image_id)):
+        if self.ocr_processor and image_path.endswith(ocr_valid_extensions) and not (image_id or image_id_exists_in_table(cursor, 'ocr', image_id)):
             features['ocr'] = self.ocr_processor.process(image_path)
 
-        if self.clip_processor and not (image_id or image_id_exists_in_table(cursor, 'clip', image_id)):
+        if self.clip_processor and image_path.endswith(clip_valid_extensions) and not (image_id or image_id_exists_in_table(cursor, 'clip', image_id)):
             image = self.clip_processor.preprocess(fs_img.img).unsqueeze(0).to(CONSTS.device)
             features['clip'] = self.clip_processor.process(image)
 
@@ -154,13 +160,13 @@ def store_features_in_db(cursor: Cursor, image_id: int, fs_img: FSProcessor, fea
 
 
 def get_image_paths(root_dir) -> Generator:
-    return (str(p) for p in Path(root_dir).rglob('*') if p.suffix.lower() in CONSTS.valid_extensions)
+    return (str(p) for p in Path(root_dir).rglob('*') if p.suffix.lower() in valid_extensions)
 
 
-def load_images_and_store_in_db(image_dir: str, processor: ImageProcessor):
-    file_paths = get_image_paths(image_dir)
-    files_found = count_image_files(image_dir)
-    files_count = min(files_found, CONSTS.limit) if CONSTS.limit else files_found
+def load_images_and_store_in_db(root_image_folder: str, processor: ImageProcessor):
+    file_paths = get_image_paths(root_image_folder)
+    files_found = count_image_files(root_image_folder)
+    files_count = min(files_found, CONSTS.processor_file_limit) if CONSTS.processor_file_limit else files_found
 
     conn: Connection = get_db_conn()
     cursor: Cursor = conn.cursor()
@@ -189,4 +195,4 @@ if __name__ == '__main__':
 
     processor = ImageProcessor(ocr_processor, clip_processor, exif_processor)
 
-    load_images_and_store_in_db(CONSTS.image_dir, processor)
+    load_images_and_store_in_db(CONSTS.root_image_folder, processor)

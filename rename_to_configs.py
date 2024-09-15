@@ -1,23 +1,21 @@
 class CONSTS:
 
-    # processing and web search
-    image_dir = '/home/USER/Documents/images/images'
-    upload_folder = '/home/USER/Documents/code/clip/static/uploads'
+    # processors and web
+    root_image_folder = '/home/USER/Documents/images/images'
     db_path = '/home/USER/Documents/code/clip/latest.db'
+    device = 'cuda' # 'cpu'
 
-    valid_extensions = (".png", ".jpg", ".jpeg") # only these have been tested
+    # processor type toggles
+    exif = 1 # 0
+    clip = 1 # 0
+    ocr = 1 # 0
 
-    # processing
-    device = "cuda" # "cpu"
-    ocr_type = "ocrs" # "doctr" "tesseract" # pick one. # does not apply if CONSTS.ocr = 0 | False.
+    processor_file_limit = 0 # 0 == all files
+    ocr_type = 'ocrs' # 'doctr' 'tesseract'
 
-    # 1 - True, 0 - False
-    exif = 1
-    clip = 1
-    ocr = 1
-
-    limit = 0 # N images to process. If 0, no limit.
-
-    # web search
-    n_results = 3 # search result count
-    secret = '3456789yefuenfhwr78ty34gtfhot3hjpo34ti8765' # change me
+    # web
+    UPLOAD_FOLDER = '/home/USER/Documents/code/clip/static/uploads'
+    MAX_CONTENT_LENGTH = 10 * 1024 * 1024 # 10 MB
+    search_result_limit = 4
+    search_clip_match_threshold = 30.0 # 30 is OK, 135 seems to be the max.
+    flask_secret = 'eererer3545t4tg4t4ef' # change me

@@ -3,7 +3,7 @@ from datetime import datetime
 from functools import cache
 from pathlib import Path
 
-from configs import CONSTS
+from consts import valid_extensions
 
 
 def get_current_datetime_w_us_str() -> str:
@@ -22,7 +22,7 @@ def get_current_datetime() -> datetime:
 
 @cache
 def count_image_files(directory) -> int:
-    file_count = sum(1 for p in Path(directory).rglob('*') if p.is_file() and p.suffix.lower() in CONSTS.valid_extensions)
+    file_count = sum(1 for p in Path(directory).rglob('*') if p.is_file() and p.suffix.lower() in valid_extensions)
     return file_count
 
 
@@ -32,3 +32,10 @@ def get_sha256(file_path) -> str:
         for chunk in iter(lambda: f.read(4096), b""):
             hasher.update(chunk)
     return hasher.hexdigest()
+
+
+def sort_two_lists(list_to_lead, list_to_follower, desc=True):
+    combined = list(zip(list_to_lead, list_to_follower))
+    sorted_combined = sorted(combined, key=lambda x: x[0], reverse=desc)
+    sorted_leader, sorted_follower = zip(*sorted_combined) if sorted_combined else ([], [])
+    return list(sorted_leader), list(sorted_follower)

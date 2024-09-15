@@ -8,26 +8,35 @@
 </head>
 <body>
     <div class="container">
-        <h1>Image Search</h1>
+        <h1><a href="/" class="a">Image Search</a></h1>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <div class="alert alert-success">
-                    {% for category, message in messages %}
-                        <p>{{ message }}</p>
-                    {% endfor %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{category}}">
+                    <p>{{ message }}</p>
                 </div>
+                {% endfor %}
             {% endif %}
         {% endwith %}
 
+        <p><small>We only support searching by a single parameter at the moment. We also limit results to {{limit}} matches</small></p>
         <form method="POST" enctype="multipart/form-data" action="/">
             {{form.hidden_tag()}}
             <div class="form-group">
-                <label for="text">Search by Text:</label>
-                {{form.text(class_='form-control', placeholder='Enter your query here')}}
+                <label for="clip">CLIP:</label>
+                {{form.clip(class_='form-control', placeholder='Enter clip query')}}
             </div>
             <div class="form-group">
-                <label for="file">Search by Image:</label>
+                <label for="exif">Exif:</label>
+                {{form.exif(class_='form-control', placeholder='Enter exif query')}}
+            </div>
+            <div class="form-group">
+                <label for="ocr">OCR:</label>
+                {{form.ocr(class_='form-control', placeholder='Enter ocr query')}}
+            </div>
+            <div class="form-group">
+                <label for="file">Image:</label>
                 {{form.file(class_='form-control-file')}}
             </div>
             {{form.search(class_='btn-primary')}}
@@ -36,13 +45,19 @@
         {% if results %}
             <h3>Results</h3>
             <div class="gallery">
-                {% for path, score, exif_summary, ocr_text in results %}
+                {% for row in results %}
                 <div class="gallery_item">
-                    <img src="{{ url_for('serve', filename=path) }}" class="img-fluid" alt="matching_image">
-                    <div class="metadata">{{ path|basename }}</div>
-                    <div class="metadata">CLIP: {{ score|round(1) }}</div>
-                    <div class="metadata">EXIF: {{ exif_summary }}</div>
-                    <div class="metadata">OCR: {{ ocr_text }}</div>
+
+                    {% if row.score %}<div class="metadata"><b>Score:</b>{{ row.score }}</div>{% endif %}
+                    <img src="{{ url_for('serve', filename=row.path) }}" class="img-fluid" alt="matching_image">
+
+                    <div class="metadata"><b>File:</b> {{ row.path|basename }}</div>
+
+                    {% if row.model %}<div class="metadata"><b>Device:</b> {{ row.model }}</div>{% endif %}
+                    {% if row.ImageDescription %}<div class="metadata"><b>ImageDescription:</b> {{ row.ImageDescription }}</div>{% endif %}
+                    {% if row.UserComment %}<div class="metadata"><b>UserComment:</b> {{ row.UserComment }}</div>{% endif %}
+                    {% if row.ocr_text %}<div class="metadata"><b>OCR:</b> {{ row.ocr_text }}</div>{% endif %}
+
                 </div>
                 {% endfor %}
             </div>
