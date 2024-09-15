@@ -22,7 +22,9 @@ def get_current_datetime() -> datetime:
 
 @cache
 def count_image_files(directory) -> int:
+    print('Counting files...')
     file_count = sum(1 for p in Path(directory).rglob('*') if p.is_file() and p.suffix.lower() in valid_extensions)
+    print('Finished.')
     return file_count
 
 

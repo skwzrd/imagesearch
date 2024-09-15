@@ -67,15 +67,30 @@ class EXIFProcessor:
 
 class FSProcessor:
     def __init__(self, image_path: str):
-        filename_original = os.path.basename(image_path)
+        self.image_path = image_path
+        self.sha256_digest: str = get_sha256(self.image_path)
 
-        self.filename_original: str = filename_original
-        self.filename_secure: str = secure_filename(filename_original)
-        self.filepath: str = os.path.dirname(image_path)
-        self.filesize_bytes: int = os.path.getsize(image_path)
-        self.sha256_digest: str = get_sha256(image_path)
-        self.img: Image = Image.open(image_path)
-        self.filetype: str = self.img.format.lower()
+        self.filename_original: str = None
+        self.filename_secure: str = None
+        self.filepath: str = None
+        self.filesize_bytes: int = None
+        self.sha256_digest: str = None
+        self.img: Image = None
+        self.filetype: str = None
+
+        self.processed = False
+
+    def process(self):
+        """We may not need to process all of this when our object is first instantiated."""
+        if not self.processed:
+            self.filename_original: str = os.path.basename(self.image_path)
+            self.filename_secure: str = secure_filename(self.filename_original)
+            self.filepath: str = os.path.dirname(self.image_path)
+            self.filesize_bytes: int = os.path.getsize(self.image_path)
+            self.img: Image = Image.open(self.image_path)
+            self.filetype: str = self.img.format.lower()
+            
+            self.processed = True
 
 
 def image_id_exists_in_table(cursor: Cursor, table_name: str, image_id: int):
@@ -90,9 +105,9 @@ class ImageProcessor:
         self.clip_processor: CLIPProcessor = clip_processor
         self.exif_processor: EXIFProcessor = exif_processor
 
+        print('Setting up sets...')
         self.sha256_digest_to_image_id: dict = {row.sha256_digest: row.image_id for row in query_db("""SELECT image_id, sha256_digest FROM image;""")}
         
-        print('Setting up sets.')
         self.clip_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM clip;""")} if CONSTS.clip else None
         self.exif_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM exif;""")} if CONSTS.exif else None
         self.ocr_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM ocr;""")} if CONSTS.ocr else None
@@ -105,14 +120,17 @@ class ImageProcessor:
         features = {}
 
         if self.exif_processor and (image_id not in self.exif_image_ids):
+            fs_img.process()
             features['exif'] = self.exif_processor.process(fs_img.img)
 
         if self.ocr_processor and (image_id not in self.ocr_image_ids):
+            fs_img.process()
             features['ocr'] = self.ocr_processor.process(image_path)
 
         if self.clip_processor and (image_id not in self.clip_image_ids):
-            image = self.clip_processor.preprocess(fs_img.img).unsqueeze(0).to(CONSTS.device) # 0.08s
-            features['clip'] = self.clip_processor.process(image) # 0.03s
+            fs_img.process()
+            image = self.clip_processor.preprocess(fs_img.img).unsqueeze(0).to(CONSTS.device) # 0.08s - bottleneck 1
+            features['clip'] = self.clip_processor.process(image) # 0.03s - bottleneck 2
 
         if features:
             store_features_in_db(cursor, image_id, fs_img, features)
