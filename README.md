@@ -13,8 +13,15 @@ Run `python3.12 web.py` to launch the web UI for searching the sqlite database.
 
 ## Dependencies
 
-- OCR [https://github.com/mindee/doctr](https://github.com/mindee/doctr)
-- Search Embeddings [https://github.com/openai/CLIP](https://github.com/openai/CLIP)
+- For searching embeddings, we use [https://github.com/openai/CLIP](https://github.com/openai/CLIP) (see `requirements.txt` for install).
+
+If you want OCR, pick one OCR program.
+
+- ocrs (recommended) (download and compile https://github.com/robertknight/ocrs)
+- doctr (see `requirements.txt`)
+- pytesseract (see `requirements.txt`)
+
+Need help choosing? See [https://neetventures.com/post/50](https://neetventures.com/post/50).
 
 ## Preview
 
