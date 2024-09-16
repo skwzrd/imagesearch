@@ -115,7 +115,7 @@ def index():
 
         form.data.clear()
 
-    return render_template('index.html', form=form, results=results, limit=CONSTS.processor_file_limit)
+    return render_template('index.html', form=form, results=results, search_result_limit=CONSTS.search_result_limit)
 
 
 @app.route('/serve/<path:filename>')

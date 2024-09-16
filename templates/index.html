@@ -20,7 +20,7 @@
             {% endif %}
         {% endwith %}
 
-        <p><small>We only support searching by a single parameter at the moment. We also limit results to {{limit}} matches</small></p>
+        <p><small>We only support searching by a single parameter at the moment. We also limit results to {{search_result_limit}} matches.</small></p>
         <form method="POST" enctype="multipart/form-data" action="/">
             {{form.hidden_tag()}}
             <div class="form-group">
