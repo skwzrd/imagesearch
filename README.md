@@ -1,4 +1,4 @@
-# EclipseImg
+# Eclipse Img
 
 Get your venv up with and install the `requirements.txt`.
 - Run `python3.12 -m pip install git+https://github.com/openai/CLIP.git` to install CLIP.

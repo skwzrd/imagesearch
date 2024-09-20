@@ -8,3 +8,4 @@ venv/
 *.gif
 !preview.png
 configs.py
+ignore/

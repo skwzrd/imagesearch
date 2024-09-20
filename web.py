@@ -32,6 +32,7 @@ def create_app():
     app.jinja_env.filters['basename'] = basename
     return app
 
+
 app = create_app()
 clip_search: CLIPSearch= CLIPSearch()
 

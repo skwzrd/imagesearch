@@ -16,3 +16,11 @@ flask-wtf
 ## OCR pick one of these, or download and compile https://github.com/robertknight/ocrs (recommended)
 # doctr
 # pytesseract
+
+## imagehash
+# imagehash
+
+## facial recognition
+## first run: python3.12 -m pip install --upgrade setuptools
+# face_recognition # Requires cmake (sudo apt install cmake). Also not that building the dlib wheel takes a few minutes
+# python3.12 -m pip install git+https://github.com/ageitgey/face_recognition_models

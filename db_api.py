@@ -4,6 +4,7 @@ from typing import List
 
 from PIL import ExifTags
 
+from consts import processor_types
 from db import query_db
 
 
@@ -136,6 +137,31 @@ def init_table_image():
     query_db(sql_string, commit=True)
 
 
+def init_table_hash():
+    sql_string = """
+        CREATE TABLE IF NOT EXISTS hash (
+            image_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            average_hash BLOB DEFAULT NULL,
+            colorhash BLOB DEFAULT NULL,
+            crop_resistant_hash BLOB DEFAULT NULL,
+            FOREIGN KEY(image_id) REFERENCES image(image_id) ON DELETE CASCADE
+        )
+    ;"""
+    query_db(sql_string, commit=True)
+
+
+def init_table_face():
+    sql_string = """
+        CREATE TABLE IF NOT EXISTS face (
+            image_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            face_count TEXT,
+            face_encodings BLOB,
+            FOREIGN KEY(image_id) REFERENCES image(image_id) ON DELETE CASCADE
+        )
+    ;"""
+    query_db(sql_string, commit=True)
+
+
 def init_table_search_log():
     sql_string = """
     CREATE TABLE IF NOT EXISTS search_log (
@@ -167,9 +193,20 @@ def init_table_search_log():
     query_db(sql_string, commit=True)
 
 
+def init_indexes():
+    for processor_type in processor_types:
+        sql = f"""CREATE INDEX IF NOT EXISTS idx_{processor_type}_image_id ON {processor_type}(image_id);"""
+        query_db(sql, commit=True)
+
+
 def init_db_all():
     init_table_image()
     init_table_exif()
     init_table_clip()
     init_table_ocr()
+    init_table_hash()
+    init_table_face()
+
+    init_indexes()
+
     init_table_search_log()
