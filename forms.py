@@ -9,34 +9,27 @@ from wtforms import (
 )
 from wtforms.validators import Length, NumberRange, Optional, ValidationError
 
+from configs import CONSTS
 from consts import clip_valid_extensions
 
 
 def validate_upload(form, field):
-    data = [
-        form.file.data,
-        form.search_average_hash.data,
-        form.search_colorhash.data,
-        form.search_crop_resistant_hash.data,
-        form.clip_file.data,
-        form.clip_text.data,
-        form.exif_text.data,
-        form.ocr_text.data,
-        form.min_face_count.data,
-    ]
+    data = []
+    for field in CONSTS.form_fields:
+        data.append(form.__getattribute__(field).data)
 
-    if not any(data) and not (isinstance(form.min_face_count.data, int) and form.min_face_count.data >= 0):
+    if not any(data):
         flash('Form must include search parameter.', 'warning')
         raise ValidationError()
 
-    if form.file.data:
-        if not form.file.data.filename.endswith(clip_valid_extensions):
+    if (CONSTS.clip or CONSTS.hash):
+        if form.file.data and not form.file.data.filename.endswith(clip_valid_extensions):
             flash('Invalid image type.', 'warning')
             raise ValidationError()
 
-    if any([form.search_average_hash.data, form.search_colorhash.data, form.search_crop_resistant_hash.data, form.clip_file.data]) and not form.file.data:
-        flash('A file is required for the selected search type.', 'warning')
-        raise ValidationError()
+        if any([form.search_average_hash.data, form.search_colorhash.data, form.search_crop_resistant_hash.data, form.clip_file.data]) and not form.file.data:
+            flash('A file is required for the selected search type.', 'warning')
+            raise ValidationError()
 
 
 class SearchForm(FlaskForm):

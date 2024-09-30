@@ -27,6 +27,17 @@ class CONSTS:
     search_clip_match_threshold = 25.0 # 30 is OK, 135 seems to be the max.
     flask_secret = 'eererer36eyher4y346t4tg4t4ef' # change me
 
-    # do not touch
+    # do not touch settings below #
     hash = any([hash_average, hash_color, hash_crop_resistant])
     face = any([face_count, face_encodings, face_save])
+
+    form_fields = ['search', 'csrf_token']
+    if hash or clip: form_fields.append('file')
+    if hash_average: form_fields.append('search_average_hash')
+    if hash_color: form_fields.append('search_colorhash')
+    if hash_crop_resistant: form_fields.append('search_crop_resistant_hash')
+    if clip: form_fields.append('clip_file')
+    if clip: form_fields.append('clip_text')
+    if exif: form_fields.append('exif_text')
+    if ocr: form_fields.append('ocr_text')
+    if face: form_fields.append('min_face_count')

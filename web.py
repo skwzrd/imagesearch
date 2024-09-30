@@ -101,15 +101,19 @@ def index():
     results = []
 
     if form.validate_on_submit():
-        file: FileStorage = form.file.data
-        search_average_hash: bool = form.search_average_hash.data
-        search_colorhash: bool = form.search_colorhash.data
-        search_crop_resistant_hash: bool = form.search_crop_resistant_hash.data
-        clip_file: bool = form.clip_file.data
-        clip_text: str = form.clip_text.data
-        exif_text: str = form.exif_text.data
-        ocr_text: str = form.ocr_text.data
-        min_face_count: int = form.min_face_count.data
+        form_fields = {}
+        for field in CONSTS.form_fields:
+            form_fields[field] = getattr(form, field).data
+
+        file: FileStorage = form_fields.get('file')
+        search_average_hash: bool = form_fields.get('search_average_hash')
+        search_colorhash: bool = form_fields.get('search_colorhash')
+        search_crop_resistant_hash: bool = form_fields.get('search_crop_resistant_hash')
+        clip_file: bool = form_fields.get('clip_file')
+        clip_text: str = form_fields.get('clip_text')
+        exif_text: str = form_fields.get('exif_text')
+        ocr_text: str = form_fields.get('ocr_text')
+        min_face_count: int = form_fields.get('min_face_count')
 
         img = None
         if file:
@@ -134,7 +138,7 @@ def index():
 
         form.data.clear()
 
-    return render_template('index.html', form=form, results=results, search_result_limit=CONSTS.search_result_limit)
+    return render_template('index.html', form=form, results=results, search_result_limit=CONSTS.search_result_limit, form_fields=CONSTS.form_fields)
 
 
 @app.route('/serve/<path:filename>')

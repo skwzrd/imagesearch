@@ -25,44 +25,60 @@
             <form method="POST" enctype="multipart/form-data" action="/">
                 {{form.hidden_tag()}}
 
-                <div class="border">
-                    <div class="form-group">
-                        <label for="file">File</label>
-                        {{form.file(class_='form-control-file')}}
-                    </div>
-                    <div class="form-group">
-                        <label for="search_average_hash">Average Hash</label>
-                        {{form.search_average_hash(class_='form-control')}}
-                    </div>
-                    <div class="form-group">
-                        <label for="search_colorhash">Color Hash</label>
-                        {{form.search_colorhash(class_='form-control')}}
-                    </div>
-                    <div class="form-group">
-                        <label for="search_crop_resistant_hash">Crop Resistant Hash</label>
-                        {{form.search_crop_resistant_hash(class_='form-control')}}
-                    </div>
-                    <div class="form-group">
-                        <label for="clip_text">CLIP File</label>
-                        {{form.clip_file(class_='form-control')}}
-                    </div>
+                {% if 'file' in form_fields %}
+                <div class="form-group">
+                    <label for="file">File</label>
+                    {{form.file(class_='form-control-file')}}
                 </div>
+                {% endif %}
+                {% if 'search_average_hash' in form_fields %}
+                <div class="form-group">
+                    <label for="search_average_hash">Average Hash</label>
+                    {{form.search_average_hash(class_='form-control')}}
+                </div>
+                {% endif %}
+                {% if 'search_crop_resistant_hash' in form_fields %}
+                <div class="form-group">
+                    <label for="search_colorhash">Color Hash</label>
+                    {{form.search_colorhash(class_='form-control')}}
+                </div>
+                {% endif %}
+                {% if 'search_crop_resistant_hash' in form_fields %}
+                <div class="form-group">
+                    <label for="search_crop_resistant_hash">Crop Resistant Hash</label>
+                    {{form.search_crop_resistant_hash(class_='form-control')}}
+                </div>
+                {% endif %}
+                {% if 'clip_file' in form_fields %}
+                <div class="form-group">
+                    <label for="clip_file">CLIP File</label>
+                    {{form.clip_file(class_='form-control')}}
+                </div>
+                {% endif %}
+                {% if 'clip_text' in form_fields %}
                 <div class="form-group">
                     <label for="clip_text">CLIP Text</label>
                     {{form.clip_text(class_='form-control', placeholder='Enter clip query')}}
                 </div>
+                {% endif %}
+                {% if 'exif_text' in form_fields %}
                 <div class="form-group">
                     <label for="exif_text">Exif Values</label>
                     {{form.exif_text(class_='form-control', placeholder='Enter exif query')}}
                 </div>
+                {% endif %}
+                {% if 'ocr_text' in form_fields %}
                 <div class="form-group">
                     <label for="ocr_text">OCR Text</label>
                     {{form.ocr_text(class_='form-control', placeholder='Enter ocr query')}}
                 </div>
+                {% endif %}
+                {% if 'min_face_count' in form_fields %}
                 <div class="form-group">
                     <label for="min_face_count">Min. Face Count</label>
                     {{form.min_face_count(class_='form-control', placeholder='0')}}
                 </div>
+                {% endif %}
                 {{form.search(class_='btn-primary')}}
             </form>
 

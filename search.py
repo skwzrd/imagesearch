@@ -64,9 +64,9 @@ def get_image_hashes_from_db():
     for row in rows:
         h = Hash(
             row.image_id,
-            pickle.loads(row.average_hash),
-            pickle.loads(row.colorhash),
-            pickle.loads(row.crop_resistant_hash),
+            pickle.loads(row.average_hash) if row.average_hash else None,
+            pickle.loads(row.colorhash) if row.colorhash else None,
+            pickle.loads(row.crop_resistant_hash) if row.crop_resistant_hash else None,
         )
         hashes.append(h)
     return hashes
