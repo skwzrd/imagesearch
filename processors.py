@@ -46,13 +46,13 @@ class OCRProcessor:
 
 class HashProcessor:
     def __init__(self, hash_dict: OrderedDict|None=None) -> None:
-        # keys must be equal to a hash table column name...
+        # keys must be equal to a hash table column name
         # you can comment out the hashes you don't want
-        self.default_hash_dict = OrderedDict(
-            average_hash=imagehash.average_hash,
-            colorhash=imagehash.colorhash,
-            crop_resistant_hash=imagehash.crop_resistant_hash, # commenting this hash makes this processor 4-5x faster
-        )
+        self.default_hash_dict = OrderedDict()
+
+        if CONSTS.hash_average: self.default_hash_dict['average_hash'] = imagehash.average_hash
+        if CONSTS.hash_color: self.default_hash_dict['colorhash'] = imagehash.colorhash
+        if CONSTS.hash_crop_resistant: self.default_hash_dict['crop_resistant_hash'] = imagehash.crop_resistant_hash
 
         if hash_dict is not None and len(hash_dict) > 0:
             for k in hash_dict:
@@ -111,18 +111,21 @@ class FaceProcessor:
     def process(self, img: Image, filename_secure: str) -> dict:
         img_array = array(img.convert('RGB'))
         model = 'hog' if CONSTS.device == 'cuda' else 'hog'
-        face_locations = face_recognition.face_locations(img_array, model=model) # 1-2images/s
+        face_locations = face_recognition.face_locations(img_array, model=model) # 1-2 images/s
 
         face_count = len(face_locations)
         face_encodings = None
 
         if face_count:
-            if True:
+            if CONSTS.face_save:
                 save_images(img_array, face_locations, filename_secure)
 
-            face_encodings: List[array] = face_recognition.face_encodings(img_array, face_locations)
+            if CONSTS.face_encodings:
+                face_encodings: List[array] = face_recognition.face_encodings(img_array, face_locations)
 
-        return dict(face_count=face_count, face_encodings=pickle.dumps(face_encodings))
+        face_encodings = pickle.dumps(face_encodings)
+
+        return dict(face_count=face_count, face_encodings=face_encodings)
 
 
 class CLIPProcessor:
