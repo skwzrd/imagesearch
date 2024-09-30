@@ -1,9 +1,13 @@
 import os
 import pickle
+import sqlite3
 from collections import OrderedDict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
+from multiprocessing import Manager, Process, Queue, set_start_method
 from pathlib import Path
-from sqlite3 import Connection, Cursor
+from queue import Empty
+from sqlite3 import Cursor
 from typing import Dict, Generator, List
 
 import torch
@@ -13,7 +17,6 @@ from werkzeug.utils import secure_filename
 
 from configs import CONSTS
 from consts import processor_types, valid_extensions
-from db import get_db_conn
 from db_api import (
     get_exif_tag_d,
     get_sql_cols_from_d,
@@ -21,8 +24,15 @@ from db_api import (
     init_db_all,
     query_db
 )
-from ocr import OCRBase, OCRDoctr, OCRRobertKnight, OCRTerreract
 from utils import count_image_files, get_dt_format, get_sha256
+
+if CONSTS.ocr:
+    if CONSTS.ocr_type == 'ocrs':
+        from ocr import OCRBase, OCRRobertKnight
+    if CONSTS.ocr_type == 'doctr':
+        from ocr import OCRBase, OCRDoctr
+    if CONSTS.ocr_type == 'tesseract':
+        from ocr import OCRBase, OCRTerreract
 
 if CONSTS.clip:
     import clip
@@ -177,7 +187,7 @@ class ImageProcessor:
         self.face_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM face;""")} if CONSTS.face else None
         print('Finished.')
 
-    def process_image(self, cursor: Cursor, image_path: str):
+    def process_image(self, image_path: str):
         fs_img = FSProcessor(image_path)
 
         image_id = self.sha256_digest_to_image_id.get(fs_img.sha256_digest, None)
@@ -203,7 +213,99 @@ class ImageProcessor:
             fs_img.process()
             features['face'] = self.face_processor.process(fs_img.img, fs_img.filename_secure)
 
-        store_features_in_db(cursor, image_id, fs_img, features)
+        return image_id, fs_img, features
+
+
+def db_writer(write_queue: Queue, db_path: str, batch_size: int = 50, timeout: int = 5):
+    """Put `None` into `write_queue` to complete process."""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    batch = []
+
+    with tqdm.tqdm(total=batch_size, desc="write queue", position=1, leave=False) as pbar:
+        while True:
+            try:
+                task = write_queue.get(timeout=timeout)  # raises Empty after timeout
+                if task is None:
+                    break  # exit signal received
+
+                batch.append(task)
+                pbar.update(1)
+
+                if len(batch) >= batch_size:
+                    for image_id, fs_img, features in batch:
+                        store_features_in_db(cursor, image_id, fs_img, features)
+                        pbar.update(-1)
+                    conn.commit()
+                    batch.clear()
+                    pbar.reset()
+
+            except Empty:
+                if batch:
+                    for image_id, fs_img, features in batch:
+                        store_features_in_db(cursor, image_id, fs_img, features)
+                        pbar.update(-1)
+                    conn.commit()
+                    batch.clear()
+                    pbar.reset()
+
+    # commits any remaining data in the batch
+    if batch:
+        for image_id, fs_img, features in batch:
+            store_features_in_db(cursor, image_id, fs_img, features)
+            pbar.update(-1)
+        conn.commit()
+    batch.clear()
+    pbar.reset()
+    cursor.close()
+    conn.close()
+
+
+def process_image_worker(image_path: str, processor: ImageProcessor, write_queue: Queue):
+    try:
+        image_id, fs_img, features = processor.process_image(image_path)
+        write_queue.put((image_id, fs_img, features))
+    except Exception as e:
+        print(f"Error processing {image_path}: {e}")
+
+
+def load_images_and_store_in_db(root_image_folder: str, image_processor: ImageProcessor):
+    file_paths = get_image_paths(root_image_folder)
+    files_found = count_image_files(root_image_folder)
+    max_file_process_count = min(files_found, CONSTS.max_file_process_count) if CONSTS.max_file_process_count else files_found
+
+    manager = Manager()
+    write_queue = manager.Queue() # share queue across processes
+
+    db_process = Process(target=db_writer, args=(write_queue, CONSTS.db_path))
+    db_process.start()
+
+    error_occurred = False
+
+    with ProcessPoolExecutor(max_workers=CONSTS.max_workers) as executor:
+        futures = []
+        for path in file_paths:
+            if len(futures) < max_file_process_count:
+                futures.append(executor.submit(process_image_worker, path, image_processor, write_queue))
+
+        with tqdm.tqdm(total=len(futures), position=0, desc='process queue') as pbar:
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"Error in future: {e}")
+                    error_occurred = True
+                    break
+                finally:
+                    pbar.update(1)
+
+    if error_occurred:
+        executor.shutdown(wait=False)
+        print("Shutting down due to an error...")
+
+    write_queue.put(None) # signal db_writer to terminate
+    db_process.join()
 
 
 def insert_feature(cursor: Cursor, image_id: int, table_name: str, feature_data: dict):
@@ -252,37 +354,8 @@ def get_image_paths(root_dir) -> Generator:
     return (str(p) for p in Path(root_dir).rglob('*') if p.suffix.lower() in valid_extensions)
 
 
-def load_images_and_store_in_db(root_image_folder: str, processor: ImageProcessor):
-    file_paths = get_image_paths(root_image_folder)
-    files_found = count_image_files(root_image_folder)
-    files_count = min(files_found, CONSTS.processor_file_limit) if CONSTS.processor_file_limit else files_found
-
-    conn: Connection = get_db_conn()
-    cursor: Cursor = conn.cursor()
-    for i, file_paths in tqdm.tqdm(enumerate(file_paths), total=files_count):
-
-        try:
-            processor.process_image(cursor, file_paths)
-        except Exception as e:
-            print(e)
-
-        if i >= files_count:
-            break
-
-        # computationally expensive
-        if (CONSTS.ocr or CONSTS.hash) and i % 50 == 0:
-            conn.commit()
-
-        # computationally cheap
-        elif not CONSTS.ocr and (CONSTS.clip or CONSTS.exif) and i % 1000 == 0:
-            conn.commit()
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-
 if __name__ == '__main__':
+    set_start_method('spawn') # allow GPU multiprocessing
     init_db_all()
 
     ocr_processor = OCRProcessor(CONSTS.ocr_type) if CONSTS.ocr else None
@@ -291,6 +364,6 @@ if __name__ == '__main__':
     hash_processor = HashProcessor() if CONSTS.hash else None
     face_processor = FaceProcessor() if CONSTS.face else None
 
-    processor = ImageProcessor(ocr_processor, clip_processor, exif_processor, hash_processor, face_processor)
+    image_processor = ImageProcessor(ocr_processor, clip_processor, exif_processor, hash_processor, face_processor)
 
-    load_images_and_store_in_db(CONSTS.root_image_folder, processor)
+    load_images_and_store_in_db(CONSTS.root_image_folder, image_processor)

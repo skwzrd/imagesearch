@@ -11,6 +11,7 @@ from flask import (
     send_file,
     url_for
 )
+from flask_bootstrap import Bootstrap5
 from PIL import Image
 from werkzeug.datastructures.file_storage import FileStorage
 from werkzeug.utils import secure_filename
@@ -42,6 +43,27 @@ def create_app():
     app.config['UPLOAD_FOLDER'] = CONSTS.UPLOAD_FOLDER
     app.config['MAX_CONTENT_LENGTH'] = CONSTS.MAX_CONTENT_LENGTH
     app.jinja_env.filters['basename'] = basename
+    app.jinja_env.keep_trailing_newline = False
+    app.jinja_env.trim_blocks = True
+
+    Bootstrap5(app)
+
+    CONSTS.hash = any([CONSTS.hash_average, CONSTS.hash_color, CONSTS.hash_crop_resistant])
+    CONSTS.face = any([CONSTS.face_count, CONSTS.face_encodings, CONSTS.face_save])
+
+    form_fields = ['search', 'csrf_token']
+    if CONSTS.hash or CONSTS.clip: form_fields.append('file')
+    if CONSTS.hash_average: form_fields.append('search_average_hash')
+    if CONSTS.hash_color: form_fields.append('search_colorhash')
+    if CONSTS.hash_crop_resistant: form_fields.append('search_crop_resistant_hash')
+    if CONSTS.clip: form_fields.append('clip_file')
+    if CONSTS.clip: form_fields.append('clip_text')
+    if CONSTS.exif: form_fields.append('exif_text')
+    if CONSTS.ocr: form_fields.append('ocr_text')
+    if CONSTS.face: form_fields.append('min_face_count')
+    if CONSTS.face: form_fields.append('max_face_count')
+    CONSTS.form_fields = form_fields
+
     return app
 
 
@@ -114,6 +136,7 @@ def index():
         exif_text: str = form_fields.get('exif_text')
         ocr_text: str = form_fields.get('ocr_text')
         min_face_count: int = form_fields.get('min_face_count')
+        max_face_count: int = form_fields.get('max_face_count')
 
         img = None
         if file:
@@ -128,6 +151,7 @@ def index():
             exif_text=exif_text,
             ocr_text=ocr_text,
             min_face_count=min_face_count,
+            max_face_count=max_face_count,
             search_average_hash=search_average_hash,
             search_colorhash=search_colorhash,
             search_crop_resistant_hash=search_crop_resistant_hash,

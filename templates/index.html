@@ -1,3 +1,4 @@
+{% from 'bootstrap5/form.html' import render_form_row %}
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -22,73 +23,58 @@
             {% endwith %}
 
             <p><small>Results are limited to {{search_result_limit}} matches.</small></p>
-            <form method="POST" enctype="multipart/form-data" action="/">
-                {{form.hidden_tag()}}
 
-                {% if 'file' in form_fields %}
-                <div class="form-group">
-                    <label for="file">File</label>
-                    {{form.file(class_='form-control-file')}}
+            <form id="main_form" action="/" method="post" novalidate=True enctype="multipart/form-data">
+                {{ form.csrf_token() }}
+                {{ render_form_row([form.file]) }}
+                <div class="row">
+                    <div class="col">
+                        <div class="mb-3 form-check">
+                            {{ form.search_average_hash.label(class_='form-check-label', for='search_average_hash') }}
+                            {{ form.search_average_hash(class_='form-check-input', checked=True) }}
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="mb-3 form-check">
+                            {{ form.clip_file.label(class_='form-check-label', for='clip_file') }}
+                            {{ form.clip_file(class_='form-check-input') }}
+                        </div>
+                    </div>
                 </div>
-                {% endif %}
-                {% if 'search_average_hash' in form_fields %}
-                <div class="form-group">
-                    <label for="search_average_hash">Average Hash</label>
-                    {{form.search_average_hash(class_='form-control')}}
+                <div class="row">
+                    <div class="col">
+                        <div class="mb-3 form-check">
+                            {{ form.search_colorhash.label(class_='form-check-label', for='search_colorhash') }}
+                            {{ form.search_colorhash(class_='form-check-input') }}
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="mb-3 form-check">
+                            {{ form.search_crop_resistant_hash.label(class_='form-check-label', for='search_crop_resistant_hash') }}
+                            {{ form.search_crop_resistant_hash(class_='form-check-input') }}
+                        </div>
+                    </div>
                 </div>
-                {% endif %}
-                {% if 'search_crop_resistant_hash' in form_fields %}
-                <div class="form-group">
-                    <label for="search_colorhash">Color Hash</label>
-                    {{form.search_colorhash(class_='form-control')}}
-                </div>
-                {% endif %}
-                {% if 'search_crop_resistant_hash' in form_fields %}
-                <div class="form-group">
-                    <label for="search_crop_resistant_hash">Crop Resistant Hash</label>
-                    {{form.search_crop_resistant_hash(class_='form-control')}}
-                </div>
-                {% endif %}
-                {% if 'clip_file' in form_fields %}
-                <div class="form-group">
-                    <label for="clip_file">CLIP File</label>
-                    {{form.clip_file(class_='form-control')}}
-                </div>
-                {% endif %}
-                {% if 'clip_text' in form_fields %}
-                <div class="form-group">
-                    <label for="clip_text">CLIP Text</label>
-                    {{form.clip_text(class_='form-control', placeholder='Enter clip query')}}
-                </div>
-                {% endif %}
-                {% if 'exif_text' in form_fields %}
-                <div class="form-group">
-                    <label for="exif_text">Exif Values</label>
-                    {{form.exif_text(class_='form-control', placeholder='Enter exif query')}}
-                </div>
-                {% endif %}
-                {% if 'ocr_text' in form_fields %}
-                <div class="form-group">
-                    <label for="ocr_text">OCR Text</label>
-                    {{form.ocr_text(class_='form-control', placeholder='Enter ocr query')}}
-                </div>
-                {% endif %}
-                {% if 'min_face_count' in form_fields %}
-                <div class="form-group">
-                    <label for="min_face_count">Min. Face Count</label>
-                    {{form.min_face_count(class_='form-control', placeholder='0')}}
-                </div>
-                {% endif %}
-                {{form.search(class_='btn-primary')}}
+                {{ render_form_row([form.clip_text]) }}
+                {{ render_form_row([form.exif_text]) }}
+                {{ render_form_row([form.ocr_text]) }}
+                {{ render_form_row([form.min_face_count, form.max_face_count]) }}
+                {{ render_form_row([form.search], button_style="btn btn-md btn-primary mt-2") }}
             </form>
 
             {% if results %}
-                <h3>Results</h3>
+                <h3>Results ({{ results|length}})</h3>
                 <div class="gallery">
                     {% for row in results %}
                         <div class="gallery_item">
-
-                            {% if row.score %}<div class="metadata"><b>Score</b>{{ row.score }}</div>{% endif %}
+                            {% if row.combined_score %}
+                                <div class="metadata"><b>CombinedScore: </b>{{ row.combined_score }}</div>
+                            {% endif %}
+                            {% if row.metrics %}
+                                {% for metric in row.metrics %}
+                                    <div class="metadata"><b>{{ metric }}: </b>{{ row.metrics[metric] }}</div>
+                                {% endfor %}
+                            {% endif %}
                             <img src="{{ url_for('serve', filename=row.path) }}" class="img-fluid" alt="matching_image">
 
                             <div class="metadata"><b>File</b> {{ row.path|basename }}</div>

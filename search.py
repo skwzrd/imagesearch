@@ -1,5 +1,6 @@
 import pickle
-from enum import Enum
+from collections import defaultdict
+from enum import Enum, StrEnum
 from functools import cache
 from typing import NamedTuple
 
@@ -74,14 +75,14 @@ def get_image_hashes_from_db():
 
 class HashSearch:
     @staticmethod
-    def search(img: Image, hash_type: HashType, max_hamming_distance: int=6, skip_image_ids: set[int]=None) -> set[int]:
+    def search(img: Image, hash_type: HashType, max_hamming_distance: int=6, skip_image_ids: set[int]=None) -> dict[int, int]:
 
         img_average_hash = average_hash(img) if hash_type == HashType.average_hash else None
         img_colorhash = colorhash(img) if hash_type == HashType.colorhash else None
         img_crop_resistant_hash = crop_resistant_hash(img) if hash_type == HashType.crop_resistant_hash else None
 
         hashes: list[Hash] = get_image_hashes_from_db()
-        image_ids: set[int] = set()
+        image_ids_2_hamming = {}
 
         for hash in hashes:
             if skip_image_ids and hash.image_id in skip_image_ids:
@@ -90,20 +91,20 @@ class HashSearch:
             if hash_type == HashType.average_hash:
                 hamming = hash.average_hash - img_average_hash
                 if hamming <= max_hamming_distance:
-                    image_ids.add(hash.image_id)
+                    image_ids_2_hamming[hash.image_id] = hamming
                     continue
             if hash_type == HashType.colorhash:
                 hamming = hash.colorhash - img_colorhash
                 if hamming <= max_hamming_distance:
-                    image_ids.add(hash.image_id)
+                    image_ids_2_hamming[hash.image_id] = hamming
                     continue
             if hash_type == HashType.crop_resistant_hash:
                 hamming = hash.crop_resistant_hash - img_crop_resistant_hash
                 if hamming <= max_hamming_distance:
-                    image_ids.add(hash.image_id)
+                    image_ids_2_hamming[hash.image_id] = hamming
                     continue
 
-        return image_ids
+        return image_ids_2_hamming
 
 
 @cache
@@ -145,7 +146,7 @@ class CLIPSearch:
             return self.get_search_results(image_features, skip_image_ids=skip_image_ids)
 
 
-    def get_search_results(self, input_features, skip_image_ids: set[int]=None):
+    def get_search_results(self, input_features, skip_image_ids: set[int]=None) -> dict[int, int]:
         image_ids, features = get_image_features_from_db()
 
         if skip_image_ids:
@@ -168,15 +169,20 @@ class CLIPSearch:
 
         top_scores, top_image_ids = sort_two_lists(top_scores_filtered, top_image_ids_filtered)
 
-        drows = {row.image_id: row for row in get_records_from_image_ids(top_image_ids)}
+        assert len(top_image_ids) == len(top_scores)
 
-        assert len(top_scores) == len(top_image_ids) == len(drows)
+        return {image_id: score for image_id, score in zip(top_image_ids, top_scores)}
 
-        results = []
-        for i, image_id in enumerate(top_image_ids):
-            results.append(dict(score=top_scores[i], **drows[image_id]))
 
-        return results
+class Metrics(StrEnum):
+    # printed to the browser
+    FaceCount = 'FaceCount'
+    AverageHash = 'AverageHash'
+    ColorHash = 'ColorHash'
+    CropResistantHash = 'CropResistantHash'
+    ClipText = 'ClipText'
+    ClipFile = 'ClipFile'
+
 
 def search_images(
     img: Image,
@@ -186,6 +192,7 @@ def search_images(
     exif_text: str = None,
     ocr_text: str = None,
     min_face_count: int = None,
+    max_face_count: int = None,
     search_average_hash: bool = None,
     search_colorhash: bool = None,
     search_crop_resistant_hash: bool = None,
@@ -194,55 +201,72 @@ def search_images(
     params = []
     image_ids = set()
     filtered = False
+    image_ids_2_metrics = defaultdict(lambda: defaultdict(dict))
+
+    def metric_routine(metric: str, ids_2_metric: dict[int, int]) -> bool:
+        nonlocal filtered
+        nonlocal image_ids
+        nonlocal image_ids_2_metrics
+
+        if filtered:
+            image_ids = image_ids.intersection(ids_2_metric.keys())
+        else:
+            image_ids = set(ids_2_metric.keys()) # the first time we are filtering
+        filtered = True
+
+        if not image_ids:
+            return False
+
+        for image_id in image_ids:
+            image_ids_2_metrics[image_id][metric] = ids_2_metric[image_id]
+
+        return True
 
     if search_average_hash:
-        ids = HashSearch.search(img, HashType.average_hash, max_hamming_distance=5, skip_image_ids=image_ids)
-        image_ids = image_ids.intersection(ids) if filtered else ids
-        if not image_ids: return []
-        filtered = True
-
+        ids_2_metric = HashSearch.search(img, HashType.average_hash, max_hamming_distance=CONSTS.search_hd_limit_average_hash)
+        if not metric_routine(Metrics.AverageHash, ids_2_metric):
+            return []
+    
     if search_colorhash:
-        ids = HashSearch.search(img, HashType.colorhash, max_hamming_distance=3, skip_image_ids=image_ids)
-        image_ids = image_ids.intersection(ids) if filtered else ids
-        if not image_ids: return []
-        filtered = True
+        ids_2_metric = HashSearch.search(img, HashType.colorhash, max_hamming_distance=CONSTS.search_hd_limit_colorhash)
+        if not metric_routine(Metrics.ColorHash, ids_2_metric):
+            return []
 
     if search_crop_resistant_hash:
-        ids = HashSearch.search(img, HashType.crop_resistant_hash, max_hamming_distance=1, skip_image_ids=image_ids)
-        image_ids = image_ids.intersection(ids) if filtered else ids
-        if not image_ids: return []
-        filtered = True
+        ids_2_metric = HashSearch.search(img, HashType.crop_resistant_hash, max_hamming_distance=CONSTS.search_hd_limit_crop_resistant_hash)
+        if not metric_routine(Metrics.CropResistantHash, ids_2_metric):
+            return []
 
     if clip_text:
-        clip_results = clip_search.search_with_text(clip_text, skip_image_ids=image_ids)
-        ids = set([result['image_id'] for result in clip_results])
-        image_ids = image_ids.intersection(ids) if filtered else ids
-        if not image_ids: return []
-        filtered = True
+        ids_2_metric = clip_search.search_with_text(clip_text)
+        if not metric_routine(Metrics.ClipText, ids_2_metric):
+            return []
     
     if clip_file:
-        clip_results = clip_search.search_with_image(img, skip_image_ids=image_ids)
-        ids = set([result['image_id'] for result in clip_results])
-        image_ids = image_ids.intersection(ids) if filtered else ids
-        if not image_ids: return []
-        filtered = True
+        ids_2_metric = clip_search.search_with_image(img)
+        if not metric_routine(Metrics.ClipFile, ids_2_metric):
+            return []
 
     if len(image_ids) > 0:
         conditions.append(f"image.image_id IN ({','.join(['?'] * len(image_ids))})")
         params.extend(image_ids)
 
     if exif_text:
-        conditions.append("(exif.ImageDescription LIKE ? OR exif.UserComment LIKE ?)")
-        exif_term = f"%{exif_text}%"
+        conditions.append("(LOWER(exif.ImageDescription) LIKE ? OR LOWER(exif.UserComment) LIKE ?)")
+        exif_term = f"%{exif_text.lower()}%"
         params.extend([exif_term, exif_term])
 
     if ocr_text:
-        conditions.append("ocr.ocr_text LIKE ?")
-        params.append(f"%{ocr_text}%")
+        conditions.append("LOWER(ocr.ocr_text) LIKE ?")
+        params.append(f"%{ocr_text.lower()}%")
 
     if min_face_count:
         conditions.append("face.face_count >= ?")
         params.append(min_face_count)
+
+    if max_face_count:
+        conditions.append("face.face_count <= ?")
+        params.append(max_face_count)
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
@@ -266,4 +290,34 @@ def search_images(
     ;"""
 
     rows = query_db(sql_string, params)
-    return [dict(row) for row in rows]
+    results = []
+    for row in rows:
+        image_ids_2_metrics[row.image_id][Metrics.FaceCount] = row.face_count
+        metrics = image_ids_2_metrics.get(row.image_id, None)
+        result = dict(
+            combined_score=get_combined_score(metrics),
+            metrics=metrics,
+            **row,
+        )
+        results.append(result)
+    results.sort(key=lambda x: x['combined_score'], reverse=True)
+    return results
+
+
+def get_combined_score(metrics: dict) -> int:
+    """Creates a score where `(worst) 0 <---> 100 (best)`.
+    """
+    score = 0
+    counts = 0
+    for metric, value in metrics.items():
+        if metric in {Metrics.AverageHash, Metrics.ColorHash, Metrics.CropResistantHash}:
+            value = max(100 - (value ** 2), 0) # 0=100, 5=75, >10=0
+            counts += 1
+            score += value
+
+        elif metric in {Metrics.ClipText, Metrics.ClipFile}:
+            value = value / 1.35 # 135 is the largest value I've seen, so we normalize to it
+            counts += 1
+            score += value
+
+    return int(score / (max(counts, 1)))

@@ -36,8 +36,8 @@ def get_sha256(file_path) -> str:
     return hasher.hexdigest()
 
 
-def sort_two_lists(list_to_lead, list_to_follower, desc=True):
-    combined = list(zip(list_to_lead, list_to_follower))
+def sort_two_lists(list_leader, list_follower, desc=True):
+    combined = list(zip(list_leader, list_follower))
     sorted_combined = sorted(combined, key=lambda x: x[0], reverse=desc)
     sorted_leader, sorted_follower = zip(*sorted_combined) if sorted_combined else ([], [])
     return list(sorted_leader), list(sorted_follower)

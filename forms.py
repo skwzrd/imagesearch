@@ -33,15 +33,16 @@ def validate_upload(form, field):
 
 
 class SearchForm(FlaskForm):
-    file = FileField('File', [validate_upload])
+    file = FileField('File (Drag \'n Drop)', [validate_upload])
     search_average_hash = BooleanField('Average Hash', default=True)
     search_colorhash = BooleanField('Color Hash', default=False)
     search_crop_resistant_hash = BooleanField('Crop Resistant Hash', default=False)
     clip_file = BooleanField('CLIP File', default=False)
     clip_text = StringField('CLIP Text', [Length(min=0, max=128)])
-    exif_text = StringField('Exif Values', [Length(min=0, max=128)], description='UserComment and ImageDescription')
+    exif_text = StringField('Exif Values', [Length(min=0, max=128)], render_kw={'placeholder': 'User Comment, Image Description'})
     ocr_text = StringField('OCR Text', [Length(min=0, max=128)])
-    min_face_count = IntegerField('Min. Face Count', [Optional(), NumberRange(min=0, max=20)])
+    min_face_count = IntegerField('Face Count, Min', [Optional(), NumberRange(min=0, max=20)])
+    max_face_count = IntegerField('Face Count, Max', [Optional(), NumberRange(min=0, max=20)])
 
     search = SubmitField('Search', validators=[])
 
@@ -57,6 +58,7 @@ class SearchForm(FlaskForm):
             'exif_text',
             'ocr_text',
             'min_face_count',
+            'max_face_count',
         ]
         for item in item_order:
             field = self._fields[item]

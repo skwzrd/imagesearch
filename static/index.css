@@ -1,5 +1,5 @@
 html {
-    font-family: Arial, sans-serif;
+    font-family: system-ui;
     background-color: #3d3d3d!important;
     margin: 0;
     padding: 0;
@@ -37,7 +37,7 @@ h1 {
 }
 
 input[type=text]{
-    width: 400px;
+    width: 300px;
     max-width: 100%;
 }
 
@@ -53,12 +53,13 @@ input[type=text]{
 }
 
 .btn-primary {
-    background-color: #007bff;
+    background-color: #4b4300;
     border: none;
     color: #ffffff;
     padding: 10px 20px;
     border-radius: 4px;
     cursor: pointer;
+    margin: 2px;
 }
 
 .btn-primary:hover {
@@ -89,7 +90,6 @@ input[type=text]{
     border-color: #a00000;
 }
 
-
 img {
     max-height: 300px;
     max-width: 300px;
@@ -102,7 +102,20 @@ img {
     justify-content: center;
 }
 
-.gallery-item img {
+.mb-3 {
+    margin: 4px;
+}
+
+.gallery_item {
+    border: 3px solid rgb(99, 99, 99);
+    background-color: #2e2e2e;
+    border-radius: 4px;
+    padding: 1em;
+    color: #e2e2e2;
+}
+
+.gallery_item img {
+    margin: 1em;
     max-width: 200px;
     max-height: 200px;
 }
@@ -114,4 +127,30 @@ img {
     font-size: x-small;
     text-align: left;
     list-style-type: none;
+}
+
+#main_form {
+    max-width: 98%;
+    margin: 2rem auto;
+    border-radius: 4px;
+}
+
+label,
+.form-label {
+    font-weight: 600;
+    color: #495057;
+}
+
+.form-control {
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    max-width: 98%;
+}
+
+.row {
+    display: flex;
+}
+
+.col {
+    padding: 2px;
 }
