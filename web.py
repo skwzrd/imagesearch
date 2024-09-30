@@ -1,4 +1,5 @@
 import os
+from enum import StrEnum
 
 from flask import (
     Flask,
@@ -10,14 +11,25 @@ from flask import (
     send_file,
     url_for
 )
+from PIL import Image
+from werkzeug.datastructures.file_storage import FileStorage
 from werkzeug.utils import secure_filename
 
 from configs import CONSTS
 from db import query_db
 from db_api import get_sql_cols_from_d, get_sql_markers_from_d
 from forms import SearchForm
-from search import CLIPSearch, search_exif, search_ocr
+from search import CLIPSearch, search_images
 from utils import get_current_datetime, get_current_datetime_w_us_str
+
+
+class SearchType(StrEnum):
+    clip_text = 'clip_text'
+    clip_file = 'clip_file'
+    exif_text = 'exif_text'
+    ocr_text = 'ocr_text'
+    face_count = 'face_count'
+    average_hash_file = 'average_hash_file'
 
 
 def basename(path):
@@ -34,29 +46,26 @@ def create_app():
 
 
 app = create_app()
-clip_search: CLIPSearch= CLIPSearch()
+clip_search: CLIPSearch = CLIPSearch()
 
 
-def save_text_or_file(text, file):
+def save_search(search_type: SearchType, text: str|None, file: FileStorage|None) -> str:
+    if not file and not text:
+        return
+
     if file:
-        text = None
-
         unique_prefix = get_current_datetime_w_us_str()
         filename_secure = f'{unique_prefix}__{secure_filename(file.filename)}'
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename_secure)
-
         with open(filepath, 'wb') as f:
             file_data = file.read()
             f.write(file_data)
         os.chmod(filepath, 0o644) # o+r+w g+r a+r, no +x
-
-    elif text:
+    else:
         filepath = None
 
-    else:
-        raise ValueError()
-    
     d = dict(
+        search_type=search_type,
         query_text=text,
         query_filepath=filepath,
         current_datetime=get_current_datetime(),
@@ -82,7 +91,8 @@ def save_text_or_file(text, file):
 
     sql_string = f"""INSERT INTO search_log ({get_sql_cols_from_d(d)}) VALUES ({get_sql_markers_from_d(d)});"""
     query_db(sql_string, args=list(d.values()), commit=True)
-    return text, filepath
+
+    return filepath
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -91,28 +101,36 @@ def index():
     results = []
 
     if form.validate_on_submit():
-        text_clip = form.clip.data
-        text_exif = form.exif.data
-        text_ocr = form.ocr.data
-        file = form.file.data
+        file: FileStorage = form.file.data
+        search_average_hash: bool = form.search_average_hash.data
+        search_colorhash: bool = form.search_colorhash.data
+        search_crop_resistant_hash: bool = form.search_crop_resistant_hash.data
+        clip_file: bool = form.clip_file.data
+        clip_text: str = form.clip_text.data
+        exif_text: str = form.exif_text.data
+        ocr_text: str = form.ocr_text.data
+        min_face_count: int = form.min_face_count.data
 
+        img = None
         if file:
-            text_clip, filepath = save_text_or_file(text_clip, file)
-            results = clip_search.search_with_image(filepath)
-            flash(f"Showing results for the image.", 'success')
+            filepath = save_search(None, None, file)
+            img = Image.open(filepath)
 
-        else:
-            if text_clip:
-                results = clip_search.search_with_text(text_clip)
-            elif text_exif:
-                results = search_exif(text_exif)
-            elif text_ocr:
-                results = search_ocr(text_ocr)
-            else:
-                flash("No valid search criteria provided.", 'warning')
+        results = search_images(
+            img,
+            clip_search=clip_search,
+            clip_text=clip_text,
+            clip_file=clip_file,
+            exif_text=exif_text,
+            ocr_text=ocr_text,
+            min_face_count=min_face_count,
+            search_average_hash=search_average_hash,
+            search_colorhash=search_colorhash,
+            search_crop_resistant_hash=search_crop_resistant_hash,
+        )
 
-            if not results:
-                flash('No results found', 'warning')
+        if not results:
+            flash('No results found', 'warning')
 
         form.data.clear()
 

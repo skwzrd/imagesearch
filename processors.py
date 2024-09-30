@@ -2,10 +2,8 @@ import os
 import pickle
 from collections import OrderedDict
 from datetime import datetime
-from itertools import batched
 from pathlib import Path
 from sqlite3 import Connection, Cursor
-from time import sleep
 from typing import Dict, Generator, List
 
 import torch
@@ -50,7 +48,7 @@ class HashProcessor:
     def __init__(self, hash_dict: OrderedDict|None=None) -> None:
         # keys must be equal to a hash table column name...
         # you can comment out the hashes you don't want
-        default_hash_dict = OrderedDict(
+        self.default_hash_dict = OrderedDict(
             average_hash=imagehash.average_hash,
             colorhash=imagehash.colorhash,
             crop_resistant_hash=imagehash.crop_resistant_hash, # commenting this hash makes this processor 4-5x faster
@@ -58,11 +56,11 @@ class HashProcessor:
 
         if hash_dict is not None and len(hash_dict) > 0:
             for k in hash_dict:
-                if k not in default_hash_dict:
+                if k not in self.default_hash_dict:
                     raise ValueError(k)
             self.hash_dict = hash_dict
         else:
-            self.hash_dict = default_hash_dict
+            self.hash_dict = self.default_hash_dict
 
     def process(self, img: Image) -> dict:
         if not img:
@@ -124,7 +122,7 @@ class FaceProcessor:
 
             face_encodings: List[array] = face_recognition.face_encodings(img_array, face_locations)
 
-        return dict(face_count=face_count, face_encodings=face_encodings)
+        return dict(face_count=face_count, face_encodings=pickle.dumps(face_encodings))
 
 
 class CLIPProcessor:
@@ -134,7 +132,7 @@ class CLIPProcessor:
         print('Finished')
 
     def process(self, img: Image) -> dict:
-        image = self.clip_processor.preprocess(img).unsqueeze(0).to(CONSTS.device) # 0.08s - bottleneck 1
+        image = self.preprocess(img).unsqueeze(0).to(CONSTS.device) # 0.08s - bottleneck 1
         with torch.no_grad():
             image_features = self.model.encode_image(image).float() # 0.03s - bottleneck 2
         return {'features': pickle.dumps(image_features.cpu().numpy())} # BLOB for column 'features'
@@ -202,6 +200,8 @@ class ImageProcessor:
             fs_img.process()
             features['face'] = self.face_processor.process(fs_img.img, fs_img.filename_secure)
 
+        store_features_in_db(cursor, image_id, fs_img, features)
+
 
 def insert_feature(cursor: Cursor, image_id: int, table_name: str, feature_data: dict):
     if feature_data is not None:
@@ -267,11 +267,11 @@ def load_images_and_store_in_db(root_image_folder: str, processor: ImageProcesso
             break
 
         # computationally expensive
-        if (CONSTS.ocr or CONSTS.hash) and i % 320 == 0:
+        if (CONSTS.ocr or CONSTS.hash) and i % 50 == 0:
             conn.commit()
 
         # computationally cheap
-        elif not CONSTS.ocr and (CONSTS.clip or CONSTS.exif) and i % 2000 == 0:
+        elif not CONSTS.ocr and (CONSTS.clip or CONSTS.exif) and i % 1000 == 0:
             conn.commit()
 
     conn.commit()

@@ -1,67 +1,91 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Search</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
-</head>
-<body>
-    <div class="container">
-        <h1><a href="/" class="a">Image Search</a></h1>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Image Search</title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+        <link rel="icon" href="data:image/png;base64," type="image/png">
+    </head>
+    <body>
+        <div class="container">
+            <h1><a href="/" class="a">Image Search</a></h1>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                <div class="alert alert-{{category}}">
-                    <p>{{ message }}</p>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{category}}">
+                            <p>{{ message }}</p>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <p><small>Results are limited to {{search_result_limit}} matches.</small></p>
+            <form method="POST" enctype="multipart/form-data" action="/">
+                {{form.hidden_tag()}}
+
+                <div class="border">
+                    <div class="form-group">
+                        <label for="file">File</label>
+                        {{form.file(class_='form-control-file')}}
+                    </div>
+                    <div class="form-group">
+                        <label for="search_average_hash">Average Hash</label>
+                        {{form.search_average_hash(class_='form-control')}}
+                    </div>
+                    <div class="form-group">
+                        <label for="search_colorhash">Color Hash</label>
+                        {{form.search_colorhash(class_='form-control')}}
+                    </div>
+                    <div class="form-group">
+                        <label for="search_crop_resistant_hash">Crop Resistant Hash</label>
+                        {{form.search_crop_resistant_hash(class_='form-control')}}
+                    </div>
+                    <div class="form-group">
+                        <label for="clip_text">CLIP File</label>
+                        {{form.clip_file(class_='form-control')}}
+                    </div>
                 </div>
-                {% endfor %}
+                <div class="form-group">
+                    <label for="clip_text">CLIP Text</label>
+                    {{form.clip_text(class_='form-control', placeholder='Enter clip query')}}
+                </div>
+                <div class="form-group">
+                    <label for="exif_text">Exif Values</label>
+                    {{form.exif_text(class_='form-control', placeholder='Enter exif query')}}
+                </div>
+                <div class="form-group">
+                    <label for="ocr_text">OCR Text</label>
+                    {{form.ocr_text(class_='form-control', placeholder='Enter ocr query')}}
+                </div>
+                <div class="form-group">
+                    <label for="min_face_count">Min. Face Count</label>
+                    {{form.min_face_count(class_='form-control', placeholder='0')}}
+                </div>
+                {{form.search(class_='btn-primary')}}
+            </form>
+
+            {% if results %}
+                <h3>Results</h3>
+                <div class="gallery">
+                    {% for row in results %}
+                        <div class="gallery_item">
+
+                            {% if row.score %}<div class="metadata"><b>Score</b>{{ row.score }}</div>{% endif %}
+                            <img src="{{ url_for('serve', filename=row.path) }}" class="img-fluid" alt="matching_image">
+
+                            <div class="metadata"><b>File</b> {{ row.path|basename }}</div>
+
+                            {% if row.model %}<div class="metadata"><b>Device</b> {{ row.model }}</div>{% endif %}
+                            {% if row.ImageDescription %}<div class="metadata"><b>ImageDescription</b> {{ row.ImageDescription }}</div>{% endif %}
+                            {% if row.UserComment %}<div class="metadata"><b>UserComment</b> {{ row.UserComment }}</div>{% endif %}
+                            {% if row.ocr_text %}<div class="metadata"><b>OCR</b> {{ row.ocr_text }}</div>{% endif %}
+
+                        </div>
+                    {% endfor %}
+                </div>
             {% endif %}
-        {% endwith %}
-
-        <p><small>We only support searching by a single parameter at the moment. We also limit results to {{search_result_limit}} matches.</small></p>
-        <form method="POST" enctype="multipart/form-data" action="/">
-            {{form.hidden_tag()}}
-            <div class="form-group">
-                <label for="clip">CLIP:</label>
-                {{form.clip(class_='form-control', placeholder='Enter clip query')}}
-            </div>
-            <div class="form-group">
-                <label for="exif">Exif:</label>
-                {{form.exif(class_='form-control', placeholder='Enter exif query')}}
-            </div>
-            <div class="form-group">
-                <label for="ocr">OCR:</label>
-                {{form.ocr(class_='form-control', placeholder='Enter ocr query')}}
-            </div>
-            <div class="form-group">
-                <label for="file">Image:</label>
-                {{form.file(class_='form-control-file')}}
-            </div>
-            {{form.search(class_='btn-primary')}}
-        </form>
-
-        {% if results %}
-            <h3>Results</h3>
-            <div class="gallery">
-                {% for row in results %}
-                <div class="gallery_item">
-
-                    {% if row.score %}<div class="metadata"><b>Score:</b>{{ row.score }}</div>{% endif %}
-                    <img src="{{ url_for('serve', filename=row.path) }}" class="img-fluid" alt="matching_image">
-
-                    <div class="metadata"><b>File:</b> {{ row.path|basename }}</div>
-
-                    {% if row.model %}<div class="metadata"><b>Device:</b> {{ row.model }}</div>{% endif %}
-                    {% if row.ImageDescription %}<div class="metadata"><b>ImageDescription:</b> {{ row.ImageDescription }}</div>{% endif %}
-                    {% if row.UserComment %}<div class="metadata"><b>UserComment:</b> {{ row.UserComment }}</div>{% endif %}
-                    {% if row.ocr_text %}<div class="metadata"><b>OCR:</b> {{ row.ocr_text }}</div>{% endif %}
-
-                </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-    </div>
-</body>
+        </div>
+    </body>
 </html>

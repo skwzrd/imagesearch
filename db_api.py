@@ -167,6 +167,7 @@ def init_table_search_log():
     CREATE TABLE IF NOT EXISTS search_log (
         search_log_id INTEGER PRIMARY KEY AUTOINCREMENT,
 
+        search_type TEXT,
         query_text TEXT,
         query_filepath TEXT,
         current_datetime DATETIME,
