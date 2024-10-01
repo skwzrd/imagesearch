@@ -11,7 +11,13 @@ html {
     padding: 20px;
     background-color: #ebebeb;
     border-radius: 8px;
-    box-shadow: 0 0 10px #0000001a;
+}
+
+.container_pad {
+    margin-top: 10px;
+    margin-left: 5px;
+    background-color: #ebebeb;
+    border-radius: 8px;
 }
 
 label {
@@ -24,7 +30,8 @@ label {
 }
 
 h1 {
-    margin-bottom: 20px;
+    margin-top: 0px;
+    margin-bottom: 10px;
     color: #343a40;
 }
 
@@ -52,18 +59,22 @@ input[type=text]{
     cursor: pointer;
 }
 
+.inline_block {
+    display: inline;
+}
+
 .btn-primary {
-    background-color: #4b4300;
+    background-color: #2e2e2e;
     border: none;
     color: #ffffff;
-    padding: 10px 20px;
+    padding: 5px 7px;
     border-radius: 4px;
     cursor: pointer;
     margin: 2px;
 }
 
 .btn-primary:hover {
-    background-color: #0056b3;
+    background-color: #3b3b3b;
 }
 
 .alert {
@@ -107,7 +118,6 @@ img {
 }
 
 .gallery_item {
-    border: 3px solid rgb(99, 99, 99);
     background-color: #2e2e2e;
     border-radius: 4px;
     padding: 1em;
@@ -130,9 +140,10 @@ img {
 }
 
 #main_form {
-    max-width: 98%;
-    margin: 2rem auto;
     border-radius: 4px;
+    border: 1px solid #2e2e2e;
+    margin: auto;
+    width: fit-content;
 }
 
 label,
@@ -153,4 +164,12 @@ label,
 
 .col {
     padding: 2px;
+}
+
+.hidden {
+    display: none;
+}
+
+ul {
+    font-size: small;
 }

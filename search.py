@@ -10,28 +10,8 @@ from PIL import Image
 
 import clip
 from configs import CONSTS
-from db_api import get_sql_markers_from_d, query_db
+from db_api import query_db
 from utils import sort_two_lists
-
-
-def get_records_from_image_ids(image_ids):
-    sql_string = f"""
-    SELECT
-        image.image_id,
-        (image.filepath || '/' || image.filename_original) as path,
-        exif.model,
-        exif.ImageDescription,
-        exif.UserComment,
-        COALESCE(ocr.ocr_text, '') as ocr_text
-    FROM image
-        LEFT JOIN exif USING(image_id)
-        LEFT JOIN clip USING(image_id)
-        LEFT JOIN ocr USING(image_id)
-        LEFT JOIN face USING(image_id)
-        LEFT JOIN hash USING(image_id)
-    WHERE image.image_id in ({get_sql_markers_from_d(image_ids)})
-    ;"""
-    return query_db(sql_string, args=image_ids)
 
 
 class HashType(Enum):
@@ -320,4 +300,4 @@ def get_combined_score(metrics: dict) -> int:
             counts += 1
             score += value
 
-    return int(score / (max(counts, 1)))
+    return min(int(score / (max(counts, 1))), 100)

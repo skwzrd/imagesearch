@@ -2,6 +2,7 @@ import hashlib
 from datetime import datetime
 from functools import cache
 from pathlib import Path
+from time import perf_counter
 
 from consts import valid_extensions
 
@@ -41,3 +42,28 @@ def sort_two_lists(list_leader, list_follower, desc=True):
     sorted_combined = sorted(combined, key=lambda x: x[0], reverse=desc)
     sorted_leader, sorted_follower = zip(*sorted_combined) if sorted_combined else ([], [])
     return list(sorted_leader), list(sorted_follower)
+
+
+class Perf:
+    __slots__ = ('previous', 'checkpoints', 'topic')
+
+    def __init__(self, topic: str=None):
+        self.topic = topic
+        self.checkpoints = []
+        self.previous = perf_counter()
+
+    def check(self, name: str=""):
+        now = perf_counter()
+        elapsed = now - self.previous
+        self.previous = now
+        self.checkpoints.append((name, elapsed))
+        return elapsed
+
+    def __repr__(self) -> str:
+        total = sum(point[1] for point in self.checkpoints)
+        longest = max(max(len(point[0]) for point in self.checkpoints), 5) # 5 is len of 'total'
+        topic = f'[{self.topic}]\n' if self.topic else ''
+        return topic + '\n'.join(
+            f'{name:<{longest}}: {elapsed:.4f} {elapsed / total * 100 :.1f}%'
+            for name, elapsed in self.checkpoints
+        ) + f'\n{"total":<{longest}}: {total:.4f}'

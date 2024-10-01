@@ -1,5 +1,6 @@
 import os
 from enum import StrEnum
+from functools import cache
 
 from flask import (
     Flask,
@@ -21,7 +22,7 @@ from db import query_db
 from db_api import get_sql_cols_from_d, get_sql_markers_from_d
 from forms import SearchForm
 from search import CLIPSearch, search_images
-from utils import get_current_datetime, get_current_datetime_w_us_str
+from utils import Perf, get_current_datetime, get_current_datetime_w_us_str
 
 
 class SearchType(StrEnum):
@@ -117,10 +118,16 @@ def save_search(search_type: SearchType, text: str|None, file: FileStorage|None)
     return filepath
 
 
+@cache
+def get_image_count():
+    return query_db('select count(*) as total_records from image;', one=True).total_records
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     form: SearchForm = SearchForm()
     results = []
+    time_elapsed = None
 
     if form.validate_on_submit():
         form_fields = {}
@@ -143,6 +150,7 @@ def index():
             filepath = save_search(None, None, file)
             img = Image.open(filepath)
 
+        p = Perf()
         results = search_images(
             img,
             clip_search=clip_search,
@@ -156,13 +164,14 @@ def index():
             search_colorhash=search_colorhash,
             search_crop_resistant_hash=search_crop_resistant_hash,
         )
+        time_elapsed = round(p.check(), 3)
 
         if not results:
             flash('No results found', 'warning')
 
         form.data.clear()
 
-    return render_template('index.html', form=form, results=results, search_result_limit=CONSTS.search_result_limit, form_fields=CONSTS.form_fields)
+    return render_template('index.html', total_records=get_image_count(), time_elapsed=time_elapsed, form=form, results=results, search_result_limit=CONSTS.search_result_limit, form_fields=CONSTS.form_fields)
 
 
 @app.route('/serve/<path:filename>')

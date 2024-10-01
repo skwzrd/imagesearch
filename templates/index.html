@@ -22,8 +22,6 @@
                 {% endif %}
             {% endwith %}
 
-            <p><small>Results are limited to {{search_result_limit}} matches.</small></p>
-
             <form id="main_form" action="/" method="post" novalidate=True enctype="multipart/form-data">
                 {{ form.csrf_token() }}
                 {{ render_form_row([form.file]) }}
@@ -63,7 +61,22 @@
             </form>
 
             {% if results %}
-                <h3>Results ({{ results|length}})</h3>
+                {% if total_records and time_elapsed %}
+                    <p class="inline_block container_pad">
+                        <button id="info_btn" class="btn-primary">Info</button>
+                        <div id="site_info" class="hidden">
+                            <ul>
+                                <li>Combined Score - Combines hamming distances from hashes, and CLIP scores. The range is 0-100. Higher is better.</li>
+                                <li>CLIP Scores - The range is 0-135+. Higher is better. 30+ indicates an ok match.</li>
+                                <li>Hash Values - Hamming distances. The range is 0-30+. Lower is better. 0 indicates an identical image.</li>
+                            </ul>
+                        </div>
+                        <small>
+                            Searched {{ total_records }} images in {{ time_elapsed }} seconds.
+                            Found {{ results|length }} results.
+                        </small>
+                    </p>
+                {% endif %}
                 <div class="gallery">
                     {% for row in results %}
                         <div class="gallery_item">
@@ -89,5 +102,11 @@
                 </div>
             {% endif %}
         </div>
+        <script>
+            document.getElementById('info_btn').addEventListener('click', function() {
+                var site_info = document.getElementById('site_info');
+                site_info.classList.toggle('hidden');
+            });
+        </script>
     </body>
 </html>
