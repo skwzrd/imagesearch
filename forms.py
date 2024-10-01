@@ -9,7 +9,7 @@ from wtforms import (
 )
 from wtforms.validators import Length, NumberRange, Optional, ValidationError
 
-from configs import CONSTS
+from consts import CONSTS
 from consts import clip_valid_extensions
 
 

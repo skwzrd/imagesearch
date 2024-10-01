@@ -9,7 +9,7 @@ from imagehash import ImageHash, average_hash, colorhash, crop_resistant_hash
 from PIL import Image
 
 import clip
-from configs import CONSTS
+from consts import CONSTS
 from db_api import query_db
 from utils import sort_two_lists
 

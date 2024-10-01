@@ -15,7 +15,7 @@ import tqdm
 from PIL import Image
 from werkzeug.utils import secure_filename
 
-from configs import CONSTS
+from consts import CONSTS
 from consts import processor_types, valid_extensions
 from db_api import (
     get_exif_tag_d,
@@ -28,11 +28,11 @@ from utils import count_image_files, get_dt_format, get_sha256
 
 if CONSTS.ocr:
     if CONSTS.ocr_type == 'ocrs':
-        from ocr import OCRBase, OCRRobertKnight
+        from ocr import OCRBase, OCRRobertKnight as OCR
     if CONSTS.ocr_type == 'doctr':
-        from ocr import OCRBase, OCRDoctr
+        from ocr import OCRBase, OCRDoctr as OCR
     if CONSTS.ocr_type == 'tesseract':
-        from ocr import OCRBase, OCRTerreract
+        from ocr import OCRBase, OCRTerreract as OCR
 
 if CONSTS.clip:
     import clip
@@ -48,7 +48,7 @@ if CONSTS.face:
 class OCRProcessor:
     def __init__(self, ocr_type) -> None:
         self.ocr_type = ocr_type
-        self.obj: OCRBase = {'ocrs': OCRRobertKnight, 'tesseract': OCRTerreract, 'doctr': OCRDoctr}[self.ocr_type]()
+        self.obj: OCRBase = OCR()
     
     def process(self, image_path) -> dict:
         return {'ocr_text': self.obj.process(image_path)}
@@ -260,6 +260,7 @@ def db_writer(write_queue: Queue, db_path: str, batch_size: int = 50, timeout: i
     pbar.reset()
     cursor.close()
     conn.close()
+    print('All records saved.')
 
 
 def process_image_worker(image_path: str, processor: ImageProcessor, write_queue: Queue):

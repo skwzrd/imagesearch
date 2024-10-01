@@ -1,7 +1,7 @@
 import sqlite3
 from contextlib import contextmanager
 
-from configs import CONSTS
+from consts import CONSTS
 
 
 def query_db(query, args=(), one=False, commit=False):

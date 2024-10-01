@@ -1,6 +1,6 @@
 import re
 
-from configs import CONSTS
+from consts import CONSTS
 
 if CONSTS.ocr:
 
