@@ -1,5 +1,9 @@
 # Eclipse Img
 
+A program that stiches together many libraries in order to provide a new image search experience.
+
+![preview](preview.png)
+
 Get your venv up with and install the `requirements.txt`.
 - Run `python3.12 -m pip install git+https://github.com/openai/CLIP.git` to install CLIP.
 - Run `python3.12 -m pip install -r requirements.txt`
@@ -21,6 +25,8 @@ If you want OCR, pick one OCR program.
 - ocrs (recommended) (download and compile [https://github.com/robertknight/ocrs](https://github.com/robertknight/ocrs))
 - doctr (see `requirements.txt`)
 - pytesseract (see `requirements.txt`)
+
+If you want facial detection to search by face counts, install `face_recognition` (see `requirements.txt` ).
 
 Need help choosing? See [https://neetventures.com/post/50](https://neetventures.com/post/50).
 
@@ -70,7 +76,3 @@ Mem:            31Gi       2.5Gi        20Gi        17Mi       8.0Gi        28Gi
 |    0   N/A  N/A     25919      C   python3.12                                    462MiB |
 +-----------------------------------------------------------------------------------------+
 ```
-
-## Preview
-
-![preview](preview.png)
