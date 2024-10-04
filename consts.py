@@ -11,7 +11,7 @@ processor_types = ['exif', 'hash', 'face', 'ocr', 'clip']
 CONSTS.hash = any([CONSTS.hash_average, CONSTS.hash_color, CONSTS.hash_crop_resistant])
 CONSTS.face = any([CONSTS.face_count, CONSTS.face_encodings, CONSTS.face_save])
 
-form_fields = ['search', 'csrf_token']
+form_fields = ['search', 'csrf_token', 'file_types']
 if CONSTS.hash or CONSTS.clip: form_fields.append('file')
 if CONSTS.hash_average: form_fields.append('search_average_hash')
 if CONSTS.hash_color: form_fields.append('search_colorhash')

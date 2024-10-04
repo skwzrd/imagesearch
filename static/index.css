@@ -114,7 +114,7 @@ img {
 }
 
 .mb-3 {
-    margin: 4px;
+    margin: 1px;
 }
 
 .gallery_item {
@@ -170,6 +170,19 @@ label,
     display: none;
 }
 
+form  ul {
+    font-size: small;
+    list-style: none;
+    display: inline-flex;
+    margin: 0;
+}
+
 ul {
     font-size: small;
+}
+
+li > label {
+    list-style: none;
+    background-color: inherit;
+    width: fit-content;
 }

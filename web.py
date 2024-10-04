@@ -119,6 +119,7 @@ def index():
             form_fields[field] = getattr(form, field).data
 
         file: FileStorage = form_fields.get('file')
+        file_types: list[str] = form_fields.get('file_types')
         search_average_hash: bool = form_fields.get('search_average_hash')
         search_colorhash: bool = form_fields.get('search_colorhash')
         search_crop_resistant_hash: bool = form_fields.get('search_crop_resistant_hash')
@@ -147,6 +148,7 @@ def index():
             search_average_hash=search_average_hash,
             search_colorhash=search_colorhash,
             search_crop_resistant_hash=search_crop_resistant_hash,
+            file_types=file_types,
         )
         time_elapsed = round(p.check(), 3)
 

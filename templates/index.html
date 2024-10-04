@@ -6,7 +6,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Image Search</title>
         <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
-        <link rel="icon" href="data:image/png;base64," type="image/png">
+        <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSJibGFjayIvPjwvc3ZnPg==">
     </head>
     <body>
         <div class="container">
@@ -25,11 +25,12 @@
             <form id="main_form" action="/" method="post" novalidate=True enctype="multipart/form-data">
                 {{ form.csrf_token() }}
                 {{ render_form_row([form.file]) }}
+                {{ render_form_row([form.file_types]) }}
                 <div class="row">
                     <div class="col">
                         <div class="mb-3 form-check">
                             {{ form.search_average_hash.label(class_='form-check-label', for='search_average_hash') }}
-                            {{ form.search_average_hash(class_='form-check-input', checked=True) }}
+                            {{ form.search_average_hash(class_='form-check-input') }}
                         </div>
                     </div>
                     <div class="col">

@@ -4,13 +4,19 @@ from wtforms import (
     BooleanField,
     FileField,
     IntegerField,
+    SelectMultipleField,
     StringField,
-    SubmitField
+    SubmitField,
+    widgets
 )
 from wtforms.validators import Length, NumberRange, Optional, ValidationError
 
-from consts import CONSTS
-from consts import clip_valid_extensions
+from consts import CONSTS, clip_valid_extensions
+
+
+class MultiCheckboxField(SelectMultipleField):
+    widget = widgets.ListWidget(prefix_label=False)
+    option_widget = widgets.CheckboxInput()
 
 
 def validate_upload(form, field):
@@ -34,7 +40,8 @@ def validate_upload(form, field):
 
 class SearchForm(FlaskForm):
     file = FileField('File (Drag \'n Drop)', [validate_upload])
-    search_average_hash = BooleanField('Average Hash', default=True)
+    file_types = MultiCheckboxField('Result File Types', choices=(('jpeg', 'jpeg'), ('png', 'png'), ('gif', 'gif')), validate_choice=True, default=['jpeg', 'png', 'gif'])
+    search_average_hash = BooleanField('Average Hash', default=False)
     search_colorhash = BooleanField('Color Hash', default=False)
     search_crop_resistant_hash = BooleanField('Crop Resistant Hash', default=False)
     clip_file = BooleanField('CLIP File', default=False)
@@ -59,6 +66,7 @@ class SearchForm(FlaskForm):
             'ocr_text',
             'min_face_count',
             'max_face_count',
+            'file_types',
         ]
         for item in item_order:
             field = self._fields[item]

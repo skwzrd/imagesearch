@@ -176,6 +176,7 @@ def search_images(
     search_average_hash: bool = None,
     search_colorhash: bool = None,
     search_crop_resistant_hash: bool = None,
+    file_types: list[str] = None,
 ):
     conditions = []
     params = []
@@ -244,9 +245,9 @@ def search_images(
         conditions.append("face.face_count >= ?")
         params.append(min_face_count)
 
-    if max_face_count:
-        conditions.append("face.face_count <= ?")
-        params.append(max_face_count)
+    if file_types:
+        conditions.append(f"image.filetype IN ({','.join(['?'] * len(file_types))})")
+        params.extend(file_types)
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 

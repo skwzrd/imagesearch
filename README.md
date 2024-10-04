@@ -1,4 +1,4 @@
-# Eclipse Img
+# ImageSearch
 
 A program that stiches together many libraries in order to provide a new image search experience.
 
