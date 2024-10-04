@@ -2,11 +2,9 @@ import os
 import pickle
 import sqlite3
 from collections import OrderedDict
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
-from multiprocessing import Manager, Process, Queue, set_start_method
+from itertools import batched
 from pathlib import Path
-from queue import Empty
 from sqlite3 import Cursor
 from typing import Dict, Generator, List
 
@@ -23,7 +21,7 @@ from db_api import (
     init_db_all,
     query_db
 )
-from utils import count_image_files, get_dt_format, get_sha256
+from utils import Perf, count_image_files, get_dt_format, get_sha256
 
 if CONSTS.ocr:
     if CONSTS.ocr_type == 'ocrs':
@@ -146,11 +144,14 @@ class CLIPProcessor:
         self.model, self.preprocess = clip.load("ViT-B/32", device=CONSTS.device)
         print('Finished')
 
-    def process(self, img: Image) -> dict:
-        image = self.preprocess(img).unsqueeze(0).to(CONSTS.device) # 0.08s - bottleneck 1
+    def process(self, images: list) -> list[dict]:
+        processed_images = torch.stack([self.preprocess(img) for img in images]).to(CONSTS.device)
+
+        features_list = []
         with torch.no_grad():
-            image_features = self.model.encode_image(image).float() # 0.03s - bottleneck 2
-        return {'features': pickle.dumps(image_features.cpu().numpy())} # BLOB for column 'features'
+            features_list.extend(self.model.encode_image(processed_images).float().cpu().numpy())
+
+        return [{'features': pickle.dumps(features)} for features in features_list]
 
 
 class EXIFProcessor:
@@ -189,126 +190,87 @@ class ImageProcessor:
         self.face_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM face;""")} if CONSTS.face else None
         print('Finished.')
 
-    def process_image(self, image_path: str):
-        fs_img = FSProcessor(image_path)
+    def process_images(self, image_paths: list[str]) -> list[tuple]:
+        features = []
+        batch_features = []
 
-        image_id = self.sha256_digest_to_image_id.get(fs_img.sha256_digest, None)
-        features = {}
+        for image_path in image_paths:
+            fs_img = FSProcessor(image_path)
 
-        if self.exif_processor and (image_id not in self.exif_image_ids):
-            fs_img.process()
-            features['exif'] = self.exif_processor.process(fs_img.img)
+            image_id = self.sha256_digest_to_image_id.get(fs_img.sha256_digest, None)
 
-        if self.ocr_processor and (image_id not in self.ocr_image_ids):
-            fs_img.process()
-            features['ocr'] = self.ocr_processor.process(image_path)
+            feature = {}
+            if self.exif_processor and (image_id not in self.exif_image_ids):
+                fs_img.process()
+                feature['exif'] = self.exif_processor.process(fs_img.img)
 
-        if self.clip_processor and (image_id not in self.clip_image_ids):
-            fs_img.process()
-            features['clip'] = self.clip_processor.process(fs_img.img)
+            if self.ocr_processor and (image_id not in self.ocr_image_ids):
+                fs_img.process()
+                feature['ocr'] = self.ocr_processor.process(image_path)
 
-        if self.hash_processor and (image_id not in self.hash_image_ids):
-            fs_img.process()
-            features['hash'] = self.hash_processor.process(fs_img.img)
+            if self.clip_processor and (image_id not in self.clip_image_ids):
+                fs_img.process()
+                batch_features.append(fs_img)
 
-        if self.face_processor and (image_id not in self.face_image_ids):
-            fs_img.process()
-            features['face'] = self.face_processor.process(fs_img.img, fs_img.filename_secure)
+            if self.hash_processor and (image_id not in self.hash_image_ids):
+                fs_img.process()
+                feature['hash'] = self.hash_processor.process(fs_img.img)
 
-        return image_id, fs_img, features
+            if self.face_processor and (image_id not in self.face_image_ids):
+                fs_img.process()
+                feature['face'] = self.face_processor.process(fs_img.img, fs_img.filename_secure)
+            
+            features.append((image_id, fs_img, feature))
 
+        if self.clip_processor and batch_features:
+            clip_features = self.clip_processor.process([fs_img.img for fs_img in batch_features])
+            for i, feature in enumerate(features):
+                features[i][2]['clip'] = clip_features[i]
 
-def db_writer(write_queue: Queue, db_path: str, batch_size: int = 50, timeout: int = 5):
-    """Put `None` into `write_queue` to complete process."""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    batch = []
-
-    with tqdm.tqdm(total=batch_size, desc="write queue", position=1, leave=False) as pbar:
-        while True:
-            try:
-                task = write_queue.get(timeout=timeout)  # raises Empty after timeout
-                if task is None:
-                    break  # exit signal received
-
-                batch.append(task)
-                pbar.update(1)
-
-                if len(batch) >= batch_size:
-                    for image_id, fs_img, features in batch:
-                        store_features_in_db(cursor, image_id, fs_img, features)
-                        pbar.update(-1)
-                    conn.commit()
-                    batch.clear()
-                    pbar.reset()
-
-            except Empty:
-                if batch:
-                    for image_id, fs_img, features in batch:
-                        store_features_in_db(cursor, image_id, fs_img, features)
-                        pbar.update(-1)
-                    conn.commit()
-                    batch.clear()
-                    pbar.reset()
-
-    # commits any remaining data in the batch
-    if batch:
-        for image_id, fs_img, features in batch:
-            store_features_in_db(cursor, image_id, fs_img, features)
-            pbar.update(-1)
-        conn.commit()
-    batch.clear()
-    pbar.reset()
-    cursor.close()
-    conn.close()
-    print('All records saved.')
+        return features
 
 
-def process_image_worker(image_path: str, processor: ImageProcessor, write_queue: Queue):
+def process_image_worker(image_path: str, processor: ImageProcessor):
     try:
         image_id, fs_img, features = processor.process_image(image_path)
-        write_queue.put((image_id, fs_img, features))
+        return (image_id, fs_img, features)
     except Exception as e:
         print(f"Error processing {image_path}: {e}")
+
+
+def write_to_db(processed_results: list[tuple]):
+    with sqlite3.connect(CONSTS.db_path) as conn:
+        cursor = conn.cursor()
+        for p in processed_results:
+            store_features_in_db(cursor, *p)
+        conn.commit()
+    processed_results.clear()
 
 
 def load_images_and_store_in_db(root_image_folder: str, image_processor: ImageProcessor):
     file_paths = get_image_paths(root_image_folder)
     files_found = count_image_files(root_image_folder)
-    max_file_process_count = min(files_found, CONSTS.max_file_process_count) if CONSTS.max_file_process_count else files_found
+    max_files_to_process = min(files_found, CONSTS.max_files_to_process) if CONSTS.max_files_to_process else files_found
 
-    manager = Manager()
-    write_queue = manager.Queue() # share queue across processes
+    processed_results = []
 
-    db_process = Process(target=db_writer, args=(write_queue, CONSTS.db_path))
-    db_process.start()
+    count = 0
+    batch_size = CONSTS.batch_size
+    with tqdm.tqdm(total=max_files_to_process, position=0, desc='queue') as pbar:
+        for path_batch in batched(file_paths, batch_size):
+            if count > max_files_to_process:
+                break
 
-    error_occurred = False
+            processed_results.extend(image_processor.process_images(path_batch))
 
-    with ProcessPoolExecutor(max_workers=CONSTS.max_workers) as executor:
-        futures = []
-        for path in file_paths:
-            if len(futures) < max_file_process_count:
-                futures.append(executor.submit(process_image_worker, path, image_processor, write_queue))
+            if len(processed_results) >= batch_size * 2:
+                write_to_db(processed_results)
 
-        with tqdm.tqdm(total=len(futures), position=0, desc='process queue') as pbar:
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception as e:
-                    print(f"Error in future: {e}")
-                    error_occurred = True
-                    break
-                finally:
-                    pbar.update(1)
+            count += len(path_batch)
+            pbar.update(len(path_batch))
 
-    if error_occurred:
-        executor.shutdown(wait=False)
-        print("Shutting down due to an error...")
-
-    write_queue.put(None) # signal db_writer to terminate
-    db_process.join()
+    if processed_results:
+        write_to_db(processed_results)
 
 
 def insert_feature(cursor: Cursor, image_id: int, table_name: str, feature_data: dict):
@@ -358,7 +320,7 @@ def get_image_paths(root_dir) -> Generator:
 
 
 if __name__ == '__main__':
-    set_start_method('spawn') # allow GPU multiprocessing
+    # set_start_method('spawn') # allow GPU multiprocessing
     init_db_all()
 
     ocr_processor = OCRProcessor(CONSTS.ocr_type) if CONSTS.ocr else None

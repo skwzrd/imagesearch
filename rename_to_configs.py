@@ -21,8 +21,8 @@ class CONSTS:
     face_save = 1      # 0 - save faces found in images
 
     # general
-    max_file_process_count = 0 # 0 == all files
-    max_workers = 4 # processes to spawn for processing images. there is one additional process for managing db writes.
+    max_files_to_process = 0 # 0 == all files
+    batch_size = 32
 
     # web
     UPLOAD_FOLDER = '/home/USER/Documents/code/clip/static/uploads'
