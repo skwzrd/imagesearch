@@ -140,7 +140,8 @@ def init_table_image():
 def init_table_hash():
     sql_string = """
         CREATE TABLE IF NOT EXISTS hash (
-            image_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            hash_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_id INTEGER,
             average_hash BLOB DEFAULT NULL,
             colorhash BLOB DEFAULT NULL,
             crop_resistant_hash BLOB DEFAULT NULL,
@@ -153,7 +154,8 @@ def init_table_hash():
 def init_table_face():
     sql_string = """
         CREATE TABLE IF NOT EXISTS face (
-            image_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            face_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_id INTEGER,
             face_count TEXT,
             face_encodings BLOB,
             FOREIGN KEY(image_id) REFERENCES image(image_id) ON DELETE CASCADE

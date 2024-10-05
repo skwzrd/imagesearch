@@ -21,7 +21,7 @@ from db_api import (
     init_db_all,
     query_db
 )
-from utils import Perf, count_image_files, get_dt_format, get_sha256
+from utils import count_image_files, get_dt_format, get_sha256
 
 if CONSTS.ocr:
     if CONSTS.ocr_type == 'ocrs':
@@ -87,7 +87,6 @@ class FSProcessor:
         self.filename_secure: str = None
         self.filepath: str = None
         self.filesize_bytes: int = None
-        self.sha256_digest: str = None
         self.img: Image = None
         self.filetype: str = None
 
@@ -119,7 +118,7 @@ class FaceProcessor:
         pass
 
     def process(self, img: Image, filename_secure: str) -> dict:
-        img_array = array(img.convert('RGB'))
+        img_array = array(img)
         model = 'hog' if CONSTS.device == 'cuda' else 'hog'
         face_locations = face_recognition.face_locations(img_array, model=model) # 1-2 images/s
 
@@ -185,57 +184,52 @@ class ImageProcessor:
 
         self.clip_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM clip;""")} if CONSTS.clip else None
         self.exif_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM exif;""")} if CONSTS.exif else None
-        self.ocr_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM ocr;""")} if CONSTS.ocr else None
+        self.ocr_image_ids:  set = {row.image_id for row in query_db("""SELECT image_id FROM ocr;""")} if CONSTS.ocr else None
         self.hash_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM hash;""")} if CONSTS.hash else None
         self.face_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM face;""")} if CONSTS.face else None
         print('Finished.')
 
     def process_images(self, image_paths: list[str]) -> list[tuple]:
         features = []
-        batch_features = []
+        fs_imgs = []
 
         for image_path in image_paths:
             fs_img = FSProcessor(image_path)
 
             image_id = self.sha256_digest_to_image_id.get(fs_img.sha256_digest, None)
+            if image_id == 121:
+                pass
 
             feature = {}
             if self.exif_processor and (image_id not in self.exif_image_ids):
                 fs_img.process()
-                feature['exif'] = self.exif_processor.process(fs_img.img)
+                feature['exif'] = self.exif_processor.process(fs_img.img) # 112/s
 
             if self.ocr_processor and (image_id not in self.ocr_image_ids):
                 fs_img.process()
-                feature['ocr'] = self.ocr_processor.process(image_path)
+                feature['ocr'] = self.ocr_processor.process(image_path) # 3/s
 
             if self.clip_processor and (image_id not in self.clip_image_ids):
                 fs_img.process()
-                batch_features.append(fs_img)
+                fs_imgs.append(fs_img.img)
 
             if self.hash_processor and (image_id not in self.hash_image_ids):
                 fs_img.process()
-                feature['hash'] = self.hash_processor.process(fs_img.img)
+                feature['hash'] = self.hash_processor.process(fs_img.img) # 40/s
 
             if self.face_processor and (image_id not in self.face_image_ids):
                 fs_img.process()
-                feature['face'] = self.face_processor.process(fs_img.img, fs_img.filename_secure)
+                feature['face'] = self.face_processor.process(fs_img.img, fs_img.filename_secure) # 1.5/s
             
-            features.append((image_id, fs_img, feature))
+            if feature:
+                features.append((image_id, fs_img, feature))
 
-        if self.clip_processor and batch_features:
-            clip_features = self.clip_processor.process([fs_img.img for fs_img in batch_features])
+        if self.clip_processor and len(fs_imgs):
+            clip_features = self.clip_processor.process(fs_imgs) # 20/s
             for i, feature in enumerate(features):
                 features[i][2]['clip'] = clip_features[i]
 
         return features
-
-
-def process_image_worker(image_path: str, processor: ImageProcessor):
-    try:
-        image_id, fs_img, features = processor.process_image(image_path)
-        return (image_id, fs_img, features)
-    except Exception as e:
-        print(f"Error processing {image_path}: {e}")
 
 
 def write_to_db(processed_results: list[tuple]):
@@ -263,7 +257,7 @@ def load_images_and_store_in_db(root_image_folder: str, image_processor: ImagePr
 
             processed_results.extend(image_processor.process_images(path_batch))
 
-            if len(processed_results) >= batch_size * 2:
+            if len(processed_results) >= batch_size:
                 write_to_db(processed_results)
 
             count += len(path_batch)

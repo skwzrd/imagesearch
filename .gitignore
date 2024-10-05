@@ -9,3 +9,4 @@ venv/
 !preview.png
 configs.py
 ignore/
+*.db-journal
