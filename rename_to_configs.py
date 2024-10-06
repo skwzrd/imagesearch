@@ -22,7 +22,8 @@ class CONSTS:
 
     # general
     max_files_to_process = 0 # 0 == all files
-    batch_size = 32
+    db_batch_size = 8
+    max_workers = 6
 
     # web
     UPLOAD_FOLDER = '/home/USER/Documents/code/clip/static/uploads'
