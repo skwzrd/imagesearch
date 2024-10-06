@@ -86,7 +86,6 @@ class FSProcessor:
         self.sha256_digest: str = get_sha256(self.image_path)
 
         self.filename_original: str = None
-        self.filename_secure: str = None
         self.filepath: str = None
         self.filesize_bytes: int = None
         self.sha256_digest: str = None
@@ -99,7 +98,6 @@ class FSProcessor:
         """We may not need to process all of this when our object is first instantiated."""
         if not self.processed:
             self.filename_original: str = os.path.basename(self.image_path)
-            self.filename_secure: str = secure_filename(self.filename_original)
             self.filepath: str = os.path.dirname(self.image_path)
             self.filesize_bytes: int = os.path.getsize(self.image_path)
             self.img: Image = Image.open(self.image_path)
@@ -108,20 +106,23 @@ class FSProcessor:
             self.processed = True
 
 
-def save_images(img_array, face_locations, filename_secure):
-    for i, face_location in enumerate(face_locations):
-        top, right, bottom, left = face_location
-        face_image = img_array[top:bottom, left:right]
-        pil_image = Image.fromarray(face_image)
-        pil_image.save(os.path.join(os.path.dirname(__file__), 'ignore', f'{filename_secure}___{str(i).zfill(3)}.png'))
-
-
 class FaceProcessor:
     def __init__(self) -> None:
         pass
 
-    def process(self, img: Image, filename_secure: str) -> dict:
-        img_array = array(img.convert('RGB'))
+    def save_images(self, img_array: list, face_locations: tuple[int], filename_secure: str):
+        for i, face_location in enumerate(face_locations):
+            top, right, bottom, left = face_location
+            face_image = img_array[top:bottom, left:right]
+            pil_image = Image.fromarray(face_image)
+            save_dir = os.path.join(os.path.dirname(__file__), 'ignore')
+            if not os.path.isdir(save_dir):
+                os.makedirs(save_dir, exist_ok=True)
+                os.chmod(save_dir, 0o777)
+            pil_image.save(os.path.join(save_dir, f'{filename_secure}___{str(i).zfill(3)}.png'))
+
+    def process(self, fs_img: FSProcessor) -> dict:
+        img_array = array(fs_img.img.convert('RGB'))
         model = 'hog' if CONSTS.device == 'cuda' else 'hog'
         face_locations = face_recognition.face_locations(img_array, model=model) # 1-2 images/s
 
@@ -130,7 +131,7 @@ class FaceProcessor:
 
         if face_count:
             if CONSTS.face_save:
-                save_images(img_array, face_locations, filename_secure)
+                self.save_images(img_array, face_locations, secure_filename(fs_img.filename_original))
 
             if CONSTS.face_encodings:
                 face_encodings: List[array] = face_recognition.face_encodings(img_array, face_locations)
@@ -213,7 +214,7 @@ class ImageProcessor:
 
         if self.face_processor and (image_id not in self.face_image_ids):
             fs_img.process()
-            features['face'] = self.face_processor.process(fs_img.img, fs_img.filename_secure)
+            features['face'] = self.face_processor.process(fs_img)
 
         return image_id, fs_img, features
 
@@ -327,7 +328,6 @@ def store_features_in_db(cursor: Cursor, image_id: int, fs_img: FSProcessor, fea
             capture_time=datetime.now().strftime(get_dt_format()),
             sha256_digest=fs_img.sha256_digest,
             filename_original=fs_img.filename_original,
-            filename_secure=fs_img.filename_secure,
             filepath=fs_img.filepath,
             filesize_bytes=fs_img.filesize_bytes,
             filetype=fs_img.filetype,
@@ -340,7 +340,6 @@ def store_features_in_db(cursor: Cursor, image_id: int, fs_img: FSProcessor, fea
                 DO UPDATE SET
                     capture_time=excluded.capture_time,
                     filename_original=excluded.filename_original,
-                    filename_secure=excluded.filename_secure,
                     filepath=excluded.filepath,
                     filesize_bytes=excluded.filesize_bytes,
                     filetype=excluded.filetype

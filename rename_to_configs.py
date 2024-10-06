@@ -2,7 +2,7 @@ class CONSTS:
     # processors and web
     root_image_folder = '/home/USER/Documents/images/images'
     db_path = '/home/USER/Documents/code/clip/00000.db'
-    device = 'cuda' # 'cpu'
+    device = 'cuda' # 'cpu' 'cuda'
 
     # processor type toggles: 1 = on, 0 = off
     exif = 1 # 0
@@ -22,7 +22,7 @@ class CONSTS:
 
     # general
     max_files_to_process = 0 # 0 == all files
-    db_batch_size = 8
+    db_batch_size = 100
     max_workers = 6
 
     # web

@@ -128,7 +128,6 @@ def init_table_image():
             capture_time TEXT,
             sha256_digest TEXT UNIQUE,
             filename_original TEXT,
-            filename_secure TEXT,
             filepath TEXT,
             filesize_bytes INTEGER,
             filetype TEXT
