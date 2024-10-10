@@ -83,12 +83,11 @@ class HashProcessor:
 class FSProcessor:
     def __init__(self, image_path: str) -> None:
         self.image_path = image_path
-        self.sha256_digest: str = get_sha256(self.image_path)
+        self.sha256_digest: str = get_sha256(image_path)
 
         self.filename_original: str = None
         self.filepath: str = None
         self.filesize_bytes: int = None
-        self.sha256_digest: str = None
         self.img: Image = None
         self.filetype: str = None
 
