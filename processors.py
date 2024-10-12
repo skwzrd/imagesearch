@@ -1,6 +1,7 @@
 import os
 import pickle
 import sqlite3
+import sys
 from collections import OrderedDict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
@@ -270,7 +271,15 @@ def process_image_worker(image_path: str, processor: ImageProcessor, write_queue
         image_id, fs_img, features = processor.process_image(image_path)
         write_queue.put((image_id, fs_img, features))
     except Exception as e:
-        print(f"Error processing {image_path}: {e}")
+        print(f'Error: {e=}')
+        print(f"{image_id=}")
+        print(f"{image_path=}")
+        print(f'{features=}')
+        print(f'{fs_img=}')
+        print(f'{vars(fs_img)=}')
+        a = input('Do you want to continue? (y/n)')
+        if a != 'y':
+            sys.exit()
 
 
 def load_images_and_store_in_db(root_image_folder: str, image_processor: ImageProcessor):
