@@ -1,9 +1,12 @@
+from enum import StrEnum
+
 from flask import flash
 from flask_wtf import FlaskForm
 from wtforms import (
     BooleanField,
     FileField,
     IntegerField,
+    RadioField,
     SelectMultipleField,
     StringField,
     SubmitField,
@@ -13,6 +16,12 @@ from wtforms.validators import Length, NumberRange, Optional, ValidationError
 
 from consts import CONSTS, clip_valid_extensions
 
+
+class Noise(StrEnum):
+    any = 'any'
+    no_junk = 'no junk'
+    camera = 'camera'
+    image = 'image'
 
 class MultiCheckboxField(SelectMultipleField):
     widget = widgets.ListWidget(prefix_label=False)
@@ -50,6 +59,7 @@ class SearchForm(FlaskForm):
     ocr_text = StringField('OCR Text', [Length(min=0, max=128)])
     min_face_count = IntegerField('Face Count, Min', [Optional(), NumberRange(min=0, max=20)])
     max_face_count = IntegerField('Face Count, Max', [Optional(), NumberRange(min=0, max=20)])
+    noise = RadioField('Noise Criteria', choices=[(c, c) for c in Noise], validate_choice=True, default=Noise.camera)
 
     search = SubmitField('Search', validators=[])
 
@@ -66,6 +76,7 @@ class SearchForm(FlaskForm):
             'ocr_text',
             'min_face_count',
             'max_face_count',
+            'noise',
             'file_types',
         ]
         for item in item_order:

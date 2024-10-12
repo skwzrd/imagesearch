@@ -11,6 +11,7 @@ from PIL import Image
 import clip
 from consts import CONSTS
 from db_api import query_db
+from forms import Noise
 from utils import sort_two_lists
 
 
@@ -109,8 +110,6 @@ class CLIPSearch:
     def __init__(self):
         print('Loading CLIP Model...')
         self.model, self.preprocess = clip.load("ViT-B/32", device=CONSTS.device)
-        print('Finished!')
-
 
     def search_with_text(self, query: str, skip_image_ids: set[int]=None):
         text = clip.tokenize([query]).to(CONSTS.device)
@@ -173,6 +172,7 @@ def search_images(
     ocr_text: str = None,
     min_face_count: int = None,
     max_face_count: int = None,
+    noise: Noise = None,
     search_average_hash: bool = None,
     search_colorhash: bool = None,
     search_crop_resistant_hash: bool = None,
@@ -245,6 +245,18 @@ def search_images(
         conditions.append("face.face_count >= ?")
         params.append(min_face_count)
 
+    if max_face_count:
+        conditions.append("face.face_count <= ?")
+        params.append(min_face_count)
+
+    if noise and noise != Noise.any:
+        if noise == Noise.camera:
+            conditions.append("ski.noise >= 0.3 and ski.noise <= 1.45")
+        elif noise == Noise.image:
+            conditions.append("ski.noise >= 0.3")
+        elif noise == Noise.no_junk:
+            conditions.append("ski.noise >= 0.1")
+
     if file_types:
         conditions.append(f"image.filetype IN ({','.join(['?'] * len(file_types))})")
         params.extend(file_types)
@@ -259,13 +271,15 @@ def search_images(
         exif.ImageDescription,
         exif.UserComment,
         COALESCE(ocr.ocr_text, '') as ocr_text,
-        face.face_count
+        face.face_count,
+        ski.noise
     FROM image
         LEFT JOIN exif USING(image_id)
         LEFT JOIN clip USING(image_id)
         LEFT JOIN ocr USING(image_id)
         LEFT JOIN face USING(image_id)
         LEFT JOIN hash USING(image_id)
+        LEFT JOIN ski USING(image_id)
     {where_clause}
     LIMIT {CONSTS.search_result_limit}
     ;"""

@@ -90,7 +90,7 @@ def init_table_exif():
     sql_string = f"""
         CREATE TABLE IF NOT EXISTS exif (
             exif_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            image_id INTEGER,
+            image_id INTEGER NOT NULL,
             {cols},
             FOREIGN KEY(image_id) REFERENCES image(image_id) ON DELETE CASCADE
     );"""
@@ -101,7 +101,7 @@ def init_table_clip():
     sql_string = """
         CREATE TABLE IF NOT EXISTS clip (
             clip_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            image_id INTEGER,
+            image_id INTEGER NOT NULL,
             features BLOB,
             FOREIGN KEY(image_id) REFERENCES image(image_id) ON DELETE CASCADE
         )
@@ -113,7 +113,7 @@ def init_table_ocr():
     sql_string = """
         CREATE TABLE IF NOT EXISTS ocr (
             ocr_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            image_id INTEGER,
+            image_id INTEGER NOT NULL,
             ocr_text TEXT,
             FOREIGN KEY(image_id) REFERENCES image(image_id) ON DELETE CASCADE
         )
@@ -124,7 +124,7 @@ def init_table_ocr():
 def init_table_image():
     sql_string = """
         CREATE TABLE IF NOT EXISTS image (
-            image_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
             capture_time TEXT,
             sha256_digest TEXT UNIQUE,
             filename_original TEXT,
@@ -140,10 +140,25 @@ def init_table_hash():
     sql_string = """
         CREATE TABLE IF NOT EXISTS hash (
             hash_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            image_id INTEGER,
+            image_id INTEGER NOT NULL,
             average_hash BLOB DEFAULT NULL,
             colorhash BLOB DEFAULT NULL,
             crop_resistant_hash BLOB DEFAULT NULL,
+            FOREIGN KEY(image_id) REFERENCES image(image_id) ON DELETE CASCADE
+        )
+    ;"""
+    query_db(sql_string, commit=True)
+
+
+def init_table_scikit():
+    sql_string = """
+        CREATE TABLE IF NOT EXISTS ski (
+            scikit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_id INTEGER NOT NULL,
+            noise REAL NOT NULL,
+            noise_1 REAL DEFAULT NULL,
+            noise_2 REAL DEFAULT NULL,
+            noise_3 REAL DEFAULT NULL,
             FOREIGN KEY(image_id) REFERENCES image(image_id) ON DELETE CASCADE
         )
     ;"""
@@ -154,7 +169,7 @@ def init_table_face():
     sql_string = """
         CREATE TABLE IF NOT EXISTS face (
             face_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            image_id INTEGER,
+            image_id INTEGER NOT NULL,
             face_count TEXT,
             face_encodings BLOB,
             FOREIGN KEY(image_id) REFERENCES image(image_id) ON DELETE CASCADE
@@ -208,6 +223,7 @@ def init_db_all():
     init_table_ocr()
     init_table_hash()
     init_table_face()
+    init_table_scikit()
 
     init_indexes()
 

@@ -13,6 +13,7 @@ from typing import Dict, Generator, List
 
 import torch
 import tqdm
+from numpy import array, ndarray
 from PIL import Image
 from werkzeug.utils import secure_filename
 
@@ -45,7 +46,31 @@ if CONSTS.hash:
 
 if CONSTS.face:
     import face_recognition
-    from numpy import array
+
+if CONSTS.ski:
+    from numpy import mean
+    from skimage.restoration import estimate_sigma
+
+
+class SkiProcessor:
+    def __init__(self) -> None:
+        pass
+
+    def process(self, img_array: ndarray) -> dict:
+        """
+        0: high noise, infographs, images not take by a camera
+        0.2 and below: should remove all garbage, cursed images
+        0.2 and up: real photos
+        """
+        noises = estimate_sigma(img_array, channel_axis=-1, average_sigmas=False)
+        noise_1, noise_2, noise_3 = (noises + [None, None, None])[:3]
+
+        return dict(
+            noise=round(mean(noises), 4),
+            noise_1=round(noise_1, 4) if noise_1 is not None else None,
+            noise_2=round(noise_2, 4) if noise_2 is not None else None,
+            noise_3=round(noise_3, 4) if noise_3 is not None else None,
+        )
 
 
 class OCRProcessor:
@@ -91,10 +116,11 @@ class FSProcessor:
         self.filesize_bytes: int = None
         self.img: Image = None
         self.filetype: str = None
+        self.img_array: ndarray = None
 
         self.processed = False
 
-    def process(self):
+    def process(self, img_array: bool=False):
         """We may not need to process all of this when our object is first instantiated."""
         if not self.processed:
             self.filename_original: str = os.path.basename(self.image_path)
@@ -104,6 +130,9 @@ class FSProcessor:
             self.filetype: str = self.img.format.lower()
             
             self.processed = True
+
+        if img_array and self.img_array is None:
+            self.img_array = array(self.img.convert('RGB'))
 
 
 class FaceProcessor:
@@ -122,19 +151,18 @@ class FaceProcessor:
             pil_image.save(os.path.join(save_dir, f'{filename_secure}___{str(i).zfill(3)}.png'))
 
     def process(self, fs_img: FSProcessor) -> dict:
-        img_array = array(fs_img.img.convert('RGB'))
         model = 'hog' if CONSTS.device == 'cuda' else 'hog'
-        face_locations = face_recognition.face_locations(img_array, model=model) # 1-2 images/s
+        face_locations = face_recognition.face_locations(fs_img.img_array, model=model) # 1-2 images/s
 
         face_count = len(face_locations)
         face_encodings = None
 
         if face_count:
             if CONSTS.face_save:
-                self.save_images(img_array, face_locations, secure_filename(fs_img.filename_original))
+                self.save_images(fs_img.img_array, face_locations, secure_filename(fs_img.filename_original))
 
             if CONSTS.face_encodings:
-                face_encodings: List[array] = face_recognition.face_encodings(img_array, face_locations)
+                face_encodings: List[array] = face_recognition.face_encodings(fs_img.img_array, face_locations)
 
         face_encodings = pickle.dumps(face_encodings)
 
@@ -145,7 +173,6 @@ class CLIPProcessor:
     def __init__(self) -> None:
         print('Loading CLIP Model...')
         self.model, self.preprocess = clip.load("ViT-B/32", device=CONSTS.device)
-        print('Finished')
 
     def process(self, img: Image) -> dict:
         image = self.preprocess(img).unsqueeze(0).to(CONSTS.device) # 0.08s - bottleneck 1
@@ -166,19 +193,14 @@ class EXIFProcessor:
         return None
 
 
-def image_id_exists_in_table(cursor: Cursor, table_name: str, image_id: int):
-    sql_string = f"SELECT 1 FROM {table_name} WHERE image_id = ? LIMIT 1;"
-    row = cursor.execute(sql_string, (image_id,)).fetchone()
-    return row
-
-
 class ImageProcessor:
-    def __init__(self, ocr_processor=None, clip_processor=None, exif_processor=None, hash_processor=None, face_processor=None):
+    def __init__(self, ocr_processor=None, clip_processor=None, exif_processor=None, hash_processor=None, face_processor=None, ski_processor=None):
         self.ocr_processor: OCRProcessor = ocr_processor
         self.clip_processor: CLIPProcessor = clip_processor
         self.exif_processor: EXIFProcessor = exif_processor
         self.hash_processor: HashProcessor = hash_processor
         self.face_processor: FaceProcessor = face_processor
+        self.ski_processor: SkiProcessor = ski_processor
 
         print('Setting up sets...')
         self.sha256_digest_to_image_id: dict = {row.sha256_digest: row.image_id for row in query_db("""SELECT image_id, sha256_digest FROM image;""")}
@@ -188,7 +210,7 @@ class ImageProcessor:
         self.ocr_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM ocr;""")} if CONSTS.ocr else None
         self.hash_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM hash;""")} if CONSTS.hash else None
         self.face_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM face;""")} if CONSTS.face else None
-        print('Finished.')
+        self.ski_image_ids: set = {row.image_id for row in query_db("""SELECT image_id FROM ski;""")} if CONSTS.ski else None
 
     def process_image(self, image_path: str):
         fs_img = FSProcessor(image_path)
@@ -213,8 +235,15 @@ class ImageProcessor:
             features['hash'] = self.hash_processor.process(fs_img.img)
 
         if self.face_processor and (image_id not in self.face_image_ids):
-            fs_img.process()
+            fs_img.process(img_array=True)
             features['face'] = self.face_processor.process(fs_img)
+
+        if self.ski_processor and (image_id not in self.ski_image_ids):
+            fs_img.process(img_array=True)
+            features['ski'] = self.ski_processor.process(fs_img.img_array)
+
+        if not features:
+            return
 
         return image_id, fs_img, features
 
@@ -266,20 +295,18 @@ def db_writer(write_queue: Queue, db_path: str, db_batch_size: int = 50, timeout
     print('\nAll records saved.')
 
 
-def process_image_worker(image_path: str, processor: ImageProcessor, write_queue: Queue):
-    try:
-        image_id, fs_img, features = processor.process_image(image_path)
+def process_image_worker_single(image_path: str, processor: ImageProcessor, cursor: Cursor):
+    result = processor.process_image(image_path)
+    if result:
+        image_id, fs_img, features = result
+        store_features_in_db(cursor, image_id, fs_img, features)
+
+
+def process_image_worker_multi(image_path: str, processor: ImageProcessor, write_queue: Queue):
+    result = processor.process_image(image_path)
+    if result:
+        image_id, fs_img, features = result
         write_queue.put((image_id, fs_img, features))
-    except Exception as e:
-        print(f'Error: {e=}')
-        print(f"{image_id=}")
-        print(f"{image_path=}")
-        print(f'{features=}')
-        print(f'{fs_img=}')
-        print(f'{vars(fs_img)=}')
-        a = input('Do you want to continue? (y/n)')
-        if a != 'y':
-            sys.exit()
 
 
 def load_images_and_store_in_db(root_image_folder: str, image_processor: ImageProcessor):
@@ -287,76 +314,84 @@ def load_images_and_store_in_db(root_image_folder: str, image_processor: ImagePr
     files_found = count_image_files(root_image_folder)
     max_files_to_process = min(files_found, CONSTS.max_files_to_process) if CONSTS.max_files_to_process else files_found
 
-    manager = Manager()
-    write_queue = manager.Queue() # share queue across processes
+    if CONSTS.max_workers < 2:
+        conn = sqlite3.connect(CONSTS.db_path, autocommit=True)
+        cursor = conn.cursor()
+        for path in tqdm.tqdm(file_paths, total=max_files_to_process, desc='progress'):
+            process_image_worker_single(path, image_processor, cursor)
+    else:
+        manager = Manager()
+        write_queue = manager.Queue() # share queue across processes
 
-    db_process = Process(target=db_writer, args=(write_queue, CONSTS.db_path, CONSTS.db_batch_size))
-    db_process.start()
+        db_process = Process(target=db_writer, args=(write_queue, CONSTS.db_path, CONSTS.db_batch_size))
+        db_process.start()
+        error_occurred = False
+        with ProcessPoolExecutor(max_workers=CONSTS.max_workers) as executor:
+            futures = []
+            for path in file_paths:
+                if len(futures) < max_files_to_process:
+                    futures.append(executor.submit(process_image_worker_multi, path, image_processor, write_queue))
 
-    error_occurred = False
+            with tqdm.tqdm(total=len(futures), position=0, desc='process queue') as pbar:
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception as e:
+                        print(f"Error in future: {e}")
+                        error_occurred = True
+                        break
+                    finally:
+                        pbar.update(1)
+        if error_occurred:
+            executor.shutdown(wait=False)
+            print("Shutting down due to an error...")
 
-    with ProcessPoolExecutor(max_workers=CONSTS.max_workers) as executor:
-        futures = []
-        for path in file_paths:
-            if len(futures) < max_files_to_process:
-                futures.append(executor.submit(process_image_worker, path, image_processor, write_queue))
-
-        with tqdm.tqdm(total=len(futures), position=0, desc='process queue') as pbar:
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception as e:
-                    print(f"Error in future: {e}")
-                    error_occurred = True
-                    break
-                finally:
-                    pbar.update(1)
-
-    if error_occurred:
-        executor.shutdown(wait=False)
-        print("Shutting down due to an error...")
-
-    write_queue.put(None) # signal db_writer to terminate
-    db_process.join()
+        write_queue.put(None) # signal db_writer to terminate
+        db_process.join()
 
 
 def insert_feature(cursor: Cursor, image_id: int, table_name: str, feature_data: dict):
-    if feature_data is not None:
-        sql_args = {
-            'image_id': image_id,
-            **feature_data
-        }
-        sql = f"INSERT INTO {table_name} ({get_sql_cols_from_d(sql_args)}) VALUES ({get_sql_markers_from_d(sql_args)});"
-        cursor.execute(sql, list(sql_args.values()))
+    sql_args = {
+        'image_id': image_id,
+    }
+    if feature_data:
+        sql_args.update(**feature_data)
+
+    sql = f"INSERT INTO {table_name} ({get_sql_cols_from_d(sql_args)}) VALUES ({get_sql_markers_from_d(sql_args)});"
+    cursor.execute(sql, list(sql_args.values()))
 
 
 def store_features_in_db(cursor: Cursor, image_id: int, fs_img: FSProcessor, features: dict):
-    if not image_id:
-        args = dict(
-            capture_time=datetime.now().strftime(get_dt_format()),
-            sha256_digest=fs_img.sha256_digest,
-            filename_original=fs_img.filename_original,
-            filepath=fs_img.filepath,
-            filesize_bytes=fs_img.filesize_bytes,
-            filetype=fs_img.filetype,
-        )
+    args = dict(
+        capture_time=datetime.now().strftime(get_dt_format()),
+        sha256_digest=fs_img.sha256_digest,
+        filename_original=fs_img.filename_original,
+        filepath=fs_img.filepath,
+        filesize_bytes=fs_img.filesize_bytes,
+        filetype=fs_img.filetype,
+    )
 
-        sql_string = f"""
-            INSERT INTO image ({get_sql_cols_from_d(args)})
-            VALUES ({get_sql_markers_from_d(args)})
-            ON CONFLICT(sha256_digest)
-                DO UPDATE SET
-                    capture_time=excluded.capture_time,
-                    filename_original=excluded.filename_original,
-                    filepath=excluded.filepath,
-                    filesize_bytes=excluded.filesize_bytes,
-                    filetype=excluded.filetype
-        ;"""
-        cursor.execute(sql_string, list(args.values()))
-        image_id = cursor.lastrowid
+    sql_string = f"""
+        INSERT INTO image ({get_sql_cols_from_d(args)})
+        VALUES ({get_sql_markers_from_d(args)})
+        ON CONFLICT(sha256_digest) DO NOTHING
+        RETURNING image_id
+    ;"""
+
+    cursor.execute(sql_string, list(args.values()))
+    image_id = cursor.fetchone()
+
+    if image_id is not None:
+        image_id = image_id[0]
+    else:
+        cursor.execute("SELECT image_id FROM image WHERE sha256_digest = ?", (args['sha256_digest'],))
+        image_id = cursor.fetchone()[0]
+
+    if not image_id:
+        raise ValueError(image_id)
 
     for process in processor_types:
-        if features.get(process) is not None:
+        if process in features:
             insert_feature(cursor, image_id, process, features[process])
 
 
@@ -373,7 +408,8 @@ if __name__ == '__main__':
     exif_processor = EXIFProcessor() if CONSTS.exif else None
     hash_processor = HashProcessor() if CONSTS.hash else None
     face_processor = FaceProcessor() if CONSTS.face else None
+    ski_processor = SkiProcessor() if CONSTS.ski else None
 
-    image_processor = ImageProcessor(ocr_processor, clip_processor, exif_processor, hash_processor, face_processor)
+    image_processor = ImageProcessor(ocr_processor, clip_processor, exif_processor, hash_processor, face_processor, ski_processor)
 
-    load_images_and_store_in_db(CONSTS.root_image_folder, image_processor)
+    load_images_and_store_in_db(CONSTS.root_image_folder_processors, image_processor)

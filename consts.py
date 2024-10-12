@@ -6,7 +6,7 @@ clip_valid_extensions = (".png", ".jpg", ".jpeg", ".gif")
 ocr_valid_extensions = (".png", ".jpg", ".jpeg")
 exif_valid_extensions = (".png", ".jpg", ".jpeg")
 
-processor_types = ['exif', 'hash', 'face', 'ocr', 'clip']
+processor_types = ['exif', 'hash', 'face', 'ocr', 'clip', 'ski']
 
 CONSTS.hash = any([CONSTS.hash_average, CONSTS.hash_color, CONSTS.hash_crop_resistant])
 CONSTS.face = any([CONSTS.face_count, CONSTS.face_encodings, CONSTS.face_save])
@@ -22,4 +22,5 @@ if CONSTS.exif: form_fields.append('exif_text')
 if CONSTS.ocr: form_fields.append('ocr_text')
 if CONSTS.face: form_fields.append('min_face_count')
 if CONSTS.face: form_fields.append('max_face_count')
+if CONSTS.ski: form_fields.append('noise')
 CONSTS.form_fields = form_fields

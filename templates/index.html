@@ -10,7 +10,7 @@
     </head>
     <body>
         <div class="container">
-            <h1><a href="/" class="a">Image Search</a></h1>
+            <h3><a href="/" class="a">Image Search</a></h3>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -24,40 +24,76 @@
 
             <form id="main_form" action="/" method="post" novalidate=True enctype="multipart/form-data">
                 {{ form.csrf_token() }}
-                {{ render_form_row([form.file]) }}
-                {{ render_form_row([form.file_types]) }}
-                <div class="row">
+
+                {% if 'file' in form_fields %}
+                    {{ render_form_row([form.file]) }}
+                    {{ render_form_row([form.file_types]) }}
+
+                    <div class="row">
+                        {% if 'hash_average' in form_fields %}
+                            <div class="col">
+                                <div class="mb-3 form-check">
+                                    {{ form.search_average_hash.label(class_='form-check-label', for='search_average_hash') }}
+                                    {{ form.search_average_hash(class_='form-check-input') }}
+                                </div>
+                            </div>
+                        {% endif %}
+                        {% if 'clip_file' in form_fields %}
+                            <div class="col">
+                                <div class="mb-3 form-check">
+                                    {{ form.clip_file.label(class_='form-check-label', for='clip_file') }}
+                                    {{ form.clip_file(class_='form-check-input') }}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    {% if 'search_colorhash' in form_fields or 'search_crop_resistant_hash' in form_fields %}
+                        <div class="row">
+                            {% if 'search_colorhash' in form_fields %}
+                                <div class="col">
+                                    <div class="mb-3 form-check">
+                                        {{ form.search_colorhash.label(class_='form-check-label', for='search_colorhash') }}
+                                        {{ form.search_colorhash(class_='form-check-input') }}
+                                    </div>
+                                </div>
+                            {% endif %}
+                            {% if 'search_crop_resistant_hash' in form_fields %}
+                                <div class="col">
+                                    <div class="mb-3 form-check">
+                                        {{ form.search_crop_resistant_hash.label(class_='form-check-label', for='search_crop_resistant_hash') }}
+                                        {{ form.search_crop_resistant_hash(class_='form-check-input') }}
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endif %}
+
+                {% if 'clip_text' in form_fields %}
+                    {{ render_form_row([form.clip_text]) }}
+                {% endif %}
+
+                {% if 'exif_text' in form_fields %}
+                    {{ render_form_row([form.exif_text]) }}
+                {% endif %}
+
+                {% if 'ocr_text' in form_fields %}
+                    {{ render_form_row([form.ocr_text]) }}
+                {% endif %}
+
+                {% if 'min_face_count' in form_fields or 'max_face_count' in form_fields %}
+                    {{ render_form_row([form.min_face_count, form.max_face_count]) }}
+                {% endif %}
+                {% if 'noise' in form_fields %}
                     <div class="col">
                         <div class="mb-3 form-check">
-                            {{ form.search_average_hash.label(class_='form-check-label', for='search_average_hash') }}
-                            {{ form.search_average_hash(class_='form-check-input') }}
+                            {{ form.noise.label(class_='form-check-label', for='noise') }}
+                            <span class="form-control">{{ form.noise() }}</span>
                         </div>
                     </div>
-                    <div class="col">
-                        <div class="mb-3 form-check">
-                            {{ form.clip_file.label(class_='form-check-label', for='clip_file') }}
-                            {{ form.clip_file(class_='form-check-input') }}
-                        </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col">
-                        <div class="mb-3 form-check">
-                            {{ form.search_colorhash.label(class_='form-check-label', for='search_colorhash') }}
-                            {{ form.search_colorhash(class_='form-check-input') }}
-                        </div>
-                    </div>
-                    <div class="col">
-                        <div class="mb-3 form-check">
-                            {{ form.search_crop_resistant_hash.label(class_='form-check-label', for='search_crop_resistant_hash') }}
-                            {{ form.search_crop_resistant_hash(class_='form-check-input') }}
-                        </div>
-                    </div>
-                </div>
-                {{ render_form_row([form.clip_text]) }}
-                {{ render_form_row([form.exif_text]) }}
-                {{ render_form_row([form.ocr_text]) }}
-                {{ render_form_row([form.min_face_count, form.max_face_count]) }}
+                {% endif %}
+
                 {{ render_form_row([form.search], button_style="btn btn-md btn-primary mt-2") }}
             </form>
 
@@ -81,22 +117,25 @@
                 <div class="gallery">
                     {% for row in results %}
                         <div class="gallery_item">
-                            {% if row.combined_score %}
-                                <div class="metadata"><b>CombinedScore: </b>{{ row.combined_score }}</div>
-                            {% endif %}
+                            <img src="{{ url_for('serve', filename=row.path) }}" class="img-fluid" alt="matching_image">
+                            <div class="metadata site_info hidden"><b>File</b> {{ row.path|basename }}</div>
+                            
+                            {% if row.model %}<div class="metadata site_info hidden"><b>Device</b> {{ row.model }}</div>{% endif %}
+                            {% if row.ImageDescription %}<div class="metadata site_info hidden"><b>ImageDescription</b> {{ row.ImageDescription }}</div>{% endif %}
+                            {% if row.UserComment %}<div class="metadata site_info hidden"><b>UserComment</b> {{ row.UserComment }}</div>{% endif %}
+                            {% if row.ocr_text %}<div class="metadata site_info hidden"><b>OCR</b> {{ row.ocr_text }}</div>{% endif %}
+
                             {% if row.metrics %}
                                 {% for metric in row.metrics %}
-                                    <div class="metadata"><b>{{ metric }}: </b>{{ row.metrics[metric] }}</div>
+                                    {% if row.metrics[metric] %}
+                                        <div class="metadata site_info hidden"><b>{{ metric }}: </b>{{ row.metrics[metric] }}</div>
+                                    {% endif %}
                                 {% endfor %}
                             {% endif %}
-                            <img src="{{ url_for('serve', filename=row.path) }}" class="img-fluid" alt="matching_image">
-
-                            <div class="metadata"><b>File</b> {{ row.path|basename }}</div>
-
-                            {% if row.model %}<div class="metadata"><b>Device</b> {{ row.model }}</div>{% endif %}
-                            {% if row.ImageDescription %}<div class="metadata"><b>ImageDescription</b> {{ row.ImageDescription }}</div>{% endif %}
-                            {% if row.UserComment %}<div class="metadata"><b>UserComment</b> {{ row.UserComment }}</div>{% endif %}
-                            {% if row.ocr_text %}<div class="metadata"><b>OCR</b> {{ row.ocr_text }}</div>{% endif %}
+                            {% if row.combined_score %}
+                                <div class="metadata site_info hidden"><b>CombinedScore: </b>{{ row.combined_score }}</div>
+                            {% endif %}
+                            {% if row.noise %}<div class="metadata site_info hidden"><b>Noise</b> {{ row.noise }}</div>{% endif %}
 
                         </div>
                     {% endfor %}
@@ -105,8 +144,9 @@
         </div>
         <script>
             document.getElementById('info_btn').addEventListener('click', function() {
-                var site_info = document.getElementById('site_info');
-                site_info.classList.toggle('hidden');
+                document.querySelectorAll('.site_info').forEach(e => {
+                    e.classList.toggle('hidden');
+                });
             });
         </script>
     </body>

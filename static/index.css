@@ -1,14 +1,11 @@
 html {
     font-family: system-ui;
     background-color: #3d3d3d!important;
-    margin: 0;
-    padding: 0;
+    margin: 8px;
 }
 
 .container {
-    max-width: 800px;
-    margin: 20px auto;
-    padding: 20px;
+    padding: 10px;
     background-color: #ebebeb;
     border-radius: 8px;
 }
@@ -29,9 +26,9 @@ label {
     font-size: small;
 }
 
-h1 {
+h3 {
     margin-top: 0px;
-    margin-bottom: 10px;
+    margin-bottom: 0px;
     color: #343a40;
 }
 
@@ -102,15 +99,19 @@ input[type=text]{
 }
 
 img {
+    height: auto;
+    max-width: 280px;
     max-height: 300px;
-    max-width: 300px;
 }
 
 .gallery {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
-    justify-content: center;
+    gap: 4px;
+}
+
+.center {
+    align-items: center;
 }
 
 .mb-3 {
@@ -120,23 +121,24 @@ img {
 .gallery_item {
     background-color: #2e2e2e;
     border-radius: 4px;
-    padding: 1em;
+    padding: 2px;
     color: #e2e2e2;
+    text-align: center;
 }
 
 .gallery_item img {
-    margin: 1em;
-    max-width: 200px;
-    max-height: 200px;
+    margin: 4px;
 }
 
 .metadata {
     padding: 0;
     margin: 0;
-    max-width: 300px;
     font-size: x-small;
     text-align: left;
     list-style-type: none;
+	max-width: min-content;
+    word-wrap: break-word;
+    width: 200px;
 }
 
 #main_form {
@@ -144,12 +146,14 @@ img {
     border: 1px solid #2e2e2e;
     margin: auto;
     width: fit-content;
+    margin-bottom: 1em;
 }
 
 label,
 .form-label {
     font-weight: 600;
     color: #495057;
+    margin-bottom: 3px;
 }
 
 .form-control {
@@ -175,6 +179,7 @@ form  ul {
     list-style: none;
     display: inline-flex;
     margin: 0;
+    padding: 0;
 }
 
 ul {

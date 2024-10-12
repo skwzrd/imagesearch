@@ -129,6 +129,7 @@ def index():
         ocr_text: str = form_fields.get('ocr_text')
         min_face_count: int = form_fields.get('min_face_count')
         max_face_count: int = form_fields.get('max_face_count')
+        noise: str = form_fields.get('noise')
 
         img = None
         if file:
@@ -145,6 +146,7 @@ def index():
             ocr_text=ocr_text,
             min_face_count=min_face_count,
             max_face_count=max_face_count,
+            noise=noise,
             search_average_hash=search_average_hash,
             search_colorhash=search_colorhash,
             search_crop_resistant_hash=search_crop_resistant_hash,
@@ -157,13 +159,21 @@ def index():
 
         form.data.clear()
 
-    return render_template('index.html', total_records=get_image_count(), time_elapsed=time_elapsed, form=form, results=results, search_result_limit=CONSTS.search_result_limit, form_fields=CONSTS.form_fields)
+    return render_template(
+        'index.html',
+        total_records=get_image_count(),
+        time_elapsed=time_elapsed,
+        form=form,
+        results=results,
+        search_result_limit=CONSTS.search_result_limit,
+        form_fields=CONSTS.form_fields
+    )
 
 
 @app.route('/serve/<path:filename>')
 def serve(filename: str):
     file_path = os.path.abspath(os.path.join('/', filename))
-    if file_path.startswith(CONSTS.root_image_folder) and os.path.isfile(file_path):
+    if file_path.startswith(CONSTS.root_image_folder_web) and os.path.isfile(file_path):
         return send_file(file_path)
     abort(404)
 

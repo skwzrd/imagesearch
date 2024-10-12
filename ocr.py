@@ -50,7 +50,6 @@ class OCRDoctr(OCRBase):
     def __init__(self):
         print('Loading OCR Model...')
         self.model: OCRPredictor = ocr_predictor(det_arch='db_resnet50', reco_arch='crnn_vgg16_bn', pretrained=True)
-        print('Finished')
 
     @apply_text_filter
     def process(self, image_path):
