@@ -200,7 +200,7 @@ def insert_feature(cursor: Cursor, image_id: int, table_name: str, feature_data:
     sql_args = {
         'image_id': image_id,
     }
-    if feature_data:
+    if feature_data is not None:
         sql_args.update(**feature_data)
 
     sql = f"INSERT INTO {table_name} ({get_sql_cols_from_d(sql_args)}) VALUES ({get_sql_markers_from_d(sql_args)});"

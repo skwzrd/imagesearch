@@ -5,6 +5,7 @@ flask
 pillow
 flask-wtf
 bootstrap-flask
+scikit-image
 
 ## embeddings
 # python3.12 -m pip install git+https://github.com/openai/CLIP.git

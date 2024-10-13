@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 
 from consts import CONSTS
 from db import query_db
-from utils import get_sha256
+from utils import get_exif_tag_d, get_sha256
 
 if CONSTS.ocr:
     if CONSTS.ocr_type == 'ocrs':
