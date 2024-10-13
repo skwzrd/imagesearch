@@ -1,28 +1,16 @@
 import os
 import pickle
-import sqlite3
 from collections import OrderedDict
-from datetime import datetime
-from multiprocessing import set_start_method
-from pathlib import Path
-from sqlite3 import Cursor
-from typing import Dict, Generator, List
+from typing import Dict, List
 
 import torch
-import tqdm
 from numpy import array, ndarray
 from PIL import Image
 from werkzeug.utils import secure_filename
 
-from consts import CONSTS, processor_types, valid_extensions
-from db_api import (
-    get_exif_tag_d,
-    get_sql_cols_from_d,
-    get_sql_markers_from_d,
-    init_db_all,
-    query_db
-)
-from utils import count_image_files, get_dt_format, get_sha256
+from consts import CONSTS
+from db import query_db
+from utils import get_sha256
 
 if CONSTS.ocr:
     if CONSTS.ocr_type == 'ocrs':
@@ -243,99 +231,3 @@ class ImageProcessor:
             return
 
         return image_id, fs_img, features
-
-
-def load_images_and_store_in_db(root_image_folder: str, image_processor: ImageProcessor):
-    file_paths = get_image_paths(root_image_folder)
-    files_found = count_image_files(root_image_folder)
-    max_files_to_process = min(files_found, CONSTS.max_files_to_process) if CONSTS.max_files_to_process else files_found
-
-    conn = sqlite3.connect(CONSTS.db_path)
-    cursor = conn.cursor()
-    batch_commit = 100
-    batch_commit_i = 0
-
-    try:
-        for i, path in tqdm.tqdm(enumerate(file_paths), total=max_files_to_process, desc='progress'):
-            if i >= max_files_to_process:
-                break
-
-            result = image_processor.process_image(path)
-            if result:
-                image_id, fs_img, features = result
-                store_features_in_db(cursor, image_id, fs_img, features)
-
-            if batch_commit_i > batch_commit:
-                conn.commit()
-                batch_commit_i = 0
-
-            batch_commit_i += 1
-    finally:
-        conn.commit()
-        cursor.close()
-        conn.close()
-
-
-def insert_feature(cursor: Cursor, image_id: int, table_name: str, feature_data: dict):
-    sql_args = {
-        'image_id': image_id,
-    }
-    if feature_data:
-        sql_args.update(**feature_data)
-
-    sql = f"INSERT INTO {table_name} ({get_sql_cols_from_d(sql_args)}) VALUES ({get_sql_markers_from_d(sql_args)});"
-    cursor.execute(sql, list(sql_args.values()))
-
-
-def store_features_in_db(cursor: Cursor, image_id: int, fs_img: FSProcessor, features: dict):
-    args = dict(
-        capture_time=datetime.now().strftime(get_dt_format()),
-        sha256_digest=fs_img.sha256_digest,
-        filename_original=fs_img.filename_original,
-        filepath=fs_img.filepath,
-        filesize_bytes=fs_img.filesize_bytes,
-        filetype=fs_img.filetype,
-    )
-
-    sql_string = f"""
-        INSERT INTO image ({get_sql_cols_from_d(args)})
-        VALUES ({get_sql_markers_from_d(args)})
-        ON CONFLICT(sha256_digest) DO NOTHING
-        RETURNING image_id
-    ;"""
-
-    cursor.execute(sql_string, list(args.values()))
-    image_id = cursor.fetchone()
-
-    if image_id is not None:
-        image_id = image_id[0]
-    else:
-        cursor.execute("SELECT image_id FROM image WHERE sha256_digest = ?", (args['sha256_digest'],))
-        image_id = cursor.fetchone()[0]
-
-    if not image_id:
-        raise ValueError(image_id)
-
-    for process in processor_types:
-        if process in features:
-            insert_feature(cursor, image_id, process, features[process])
-
-
-def get_image_paths(root_dir) -> Generator:
-    return (str(p) for p in Path(root_dir).rglob('*') if p.suffix.lower() in valid_extensions)
-
-
-if __name__ == '__main__':
-    set_start_method('spawn') # allow GPU multiprocessing
-    init_db_all()
-
-    ocr_processor = OCRProcessor(CONSTS.ocr_type) if CONSTS.ocr else None
-    clip_processor = CLIPProcessor() if CONSTS.clip else None
-    exif_processor = EXIFProcessor() if CONSTS.exif else None
-    hash_processor = HashProcessor() if CONSTS.hash else None
-    face_processor = FaceProcessor() if CONSTS.face else None
-    ski_processor = SkiProcessor() if CONSTS.ski else None
-
-    image_processor = ImageProcessor(ocr_processor, clip_processor, exif_processor, hash_processor, face_processor, ski_processor)
-
-    load_images_and_store_in_db(CONSTS.root_image_folder_processors, image_processor)

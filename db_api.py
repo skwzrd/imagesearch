@@ -1,11 +1,10 @@
-from functools import cache
-from string import ascii_letters, digits
-from typing import List
-
-from PIL import ExifTags
+from datetime import datetime
+from sqlite3 import Cursor
 
 from consts import processor_types
 from db import query_db
+from processor import FSProcessor
+from utils import get_dt_format, get_exif_tag_names
 
 
 def set_sql_settings_optimize_bulk_writing():
@@ -50,25 +49,6 @@ def set_sql_settings_default():
     ]
     for sql in sqls:
         query_db(sql, commit=True)
-
-
-@cache
-def get_exif_tag_d() -> dict:
-    tags: dict = ExifTags.TAGS
-    tags.update(ExifTags.GPSTAGS)
-    for num, name in tags.items():
-        tags[num] = name.replace('/', '')
-        if set(tags[num]).difference(set(ascii_letters + digits)):
-            raise ValueError(f'{tags[num]=}')
-    assert len(tags.values()) > 200
-    return tags
-
-
-@cache
-def get_exif_tag_names() -> List[str]:
-    tags = list(set(get_exif_tag_d().values()))
-    tags.sort(key=lambda x: x.lower())
-    return tags
 
 
 def get_sql_cols_from_d(d):
@@ -214,6 +194,51 @@ def init_indexes():
     for processor_type in processor_types:
         sql = f"""CREATE INDEX IF NOT EXISTS idx_{processor_type}_image_id ON {processor_type}(image_id);"""
         query_db(sql, commit=True)
+
+
+def insert_feature(cursor: Cursor, image_id: int, table_name: str, feature_data: dict):
+    sql_args = {
+        'image_id': image_id,
+    }
+    if feature_data:
+        sql_args.update(**feature_data)
+
+    sql = f"INSERT INTO {table_name} ({get_sql_cols_from_d(sql_args)}) VALUES ({get_sql_markers_from_d(sql_args)});"
+    cursor.execute(sql, list(sql_args.values()))
+
+
+def store_features_in_db(cursor: Cursor, image_id: int, fs_img: FSProcessor, features: dict):
+    args = dict(
+        capture_time=datetime.now().strftime(get_dt_format()),
+        sha256_digest=fs_img.sha256_digest,
+        filename_original=fs_img.filename_original,
+        filepath=fs_img.filepath,
+        filesize_bytes=fs_img.filesize_bytes,
+        filetype=fs_img.filetype,
+    )
+
+    sql_string = f"""
+        INSERT INTO image ({get_sql_cols_from_d(args)})
+        VALUES ({get_sql_markers_from_d(args)})
+        ON CONFLICT(sha256_digest) DO NOTHING
+        RETURNING image_id
+    ;"""
+
+    cursor.execute(sql_string, list(args.values()))
+    image_id = cursor.fetchone()
+
+    if image_id is not None:
+        image_id = image_id[0]
+    else:
+        cursor.execute("SELECT image_id FROM image WHERE sha256_digest = ?", (args['sha256_digest'],))
+        image_id = cursor.fetchone()[0]
+
+    if not image_id:
+        raise ValueError(image_id)
+
+    for process in processor_types:
+        if process in features:
+            insert_feature(cursor, image_id, process, features[process])
 
 
 def init_db_all():

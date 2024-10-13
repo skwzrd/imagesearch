@@ -2,25 +2,26 @@ html {
     font-family: system-ui;
     background-color: #3d3d3d!important;
     margin: 8px;
+    color: #e4e4e4!important;
 }
 
 .container {
     padding: 10px;
-    background-color: #ebebeb;
+    background-color: #464646;
     border-radius: 8px;
 }
 
 .container_pad {
-    margin-top: 10px;
-    margin-left: 5px;
-    background-color: #ebebeb;
-    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 5px;
 }
 
 label {
     width: 150px;
     display: inline-block;
-    background-color: #c9ab00;
+    background-color: #5f5100;
     border-radius: 4px;
     padding: 4px;
     font-size: small;
@@ -29,11 +30,10 @@ label {
 h3 {
     margin-top: 0px;
     margin-bottom: 0px;
-    color: #343a40;
 }
 
 .a, .a:visited {
-    color: rgb(36, 36, 36)
+    color: inherit;
 }
 
 .form-group {
@@ -61,9 +61,9 @@ input[type=text]{
 }
 
 .btn-primary {
-    background-color: #2e2e2e;
+    background-color: #5f5100;
     border: none;
-    color: #ffffff;
+    color: inherit;
     padding: 5px 7px;
     border-radius: 4px;
     cursor: pointer;
@@ -71,13 +71,16 @@ input[type=text]{
 }
 
 .btn-primary:hover {
-    background-color: #3b3b3b;
+    background-color: #4e4300;
 }
 
 .alert {
     border-radius: 4px;
-    padding: 10px;
-    margin-bottom: 20px;
+    padding: 5px;
+    margin: auto;
+    margin-top: 5px;
+    margin-bottom: 10px;
+    max-width: 500px;
 }
 
 .alert-success {
@@ -122,7 +125,6 @@ img {
     background-color: #2e2e2e;
     border-radius: 4px;
     padding: 2px;
-    color: #e2e2e2;
     text-align: center;
 }
 
@@ -146,18 +148,17 @@ img {
     border: 1px solid #2e2e2e;
     margin: auto;
     width: fit-content;
-    margin-bottom: 1em;
+    background-color: #303030;
 }
 
 label,
 .form-label {
     font-weight: 600;
-    color: #495057;
     margin-bottom: 3px;
 }
 
 .form-control {
-    border: 1px solid #ced4da;
+    border: 1px solid;
     border-radius: 4px;
     max-width: 98%;
 }

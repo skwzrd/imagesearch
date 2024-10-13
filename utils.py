@@ -2,10 +2,32 @@ import hashlib
 from datetime import datetime
 from functools import cache
 from pathlib import Path
+from string import ascii_letters, digits
 from time import perf_counter
+from typing import List
+
+from PIL import ExifTags
 
 from consts import valid_extensions
 
+
+@cache
+def get_exif_tag_d() -> dict:
+    tags: dict = ExifTags.TAGS
+    tags.update(ExifTags.GPSTAGS)
+    for num, name in tags.items():
+        tags[num] = name.replace('/', '')
+        if set(tags[num]).difference(set(ascii_letters + digits)):
+            raise ValueError(f'{tags[num]=}')
+    assert len(tags.values()) > 200
+    return tags
+
+
+@cache
+def get_exif_tag_names() -> List[str]:
+    tags = list(set(get_exif_tag_d().values()))
+    tags.sort(key=lambda x: x.lower())
+    return tags
 
 def get_current_datetime_w_us_str() -> str:
     now = datetime.now()
