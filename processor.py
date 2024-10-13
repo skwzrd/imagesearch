@@ -49,7 +49,7 @@ class SkiProcessor:
         """
         noises = estimate_sigma(img_array, channel_axis=-1, average_sigmas=False)
         
-        average_noise = nanmean(average_noise) if not nanall(isnan(average_noise)) else 0.0
+        average_noise = nanmean(noises) if not nanall(isnan(noises)) else 0.0
 
         noise_1, noise_2, noise_3 = (noises + [None, None, None])[:3]
 
