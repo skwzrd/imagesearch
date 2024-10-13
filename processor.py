@@ -33,7 +33,7 @@ if CONSTS.face:
     import face_recognition
 
 if CONSTS.ski:
-    from numpy import mean
+    from numpy import nanmean, all as nanall, isnan
     from skimage.restoration import estimate_sigma
 
 
@@ -48,10 +48,13 @@ class SkiProcessor:
         0.2 and up: real photos
         """
         noises = estimate_sigma(img_array, channel_axis=-1, average_sigmas=False)
+        
+        average_noise = nanmean(average_noise) if not nanall(isnan(average_noise)) else 0.0
+
         noise_1, noise_2, noise_3 = (noises + [None, None, None])[:3]
 
         return dict(
-            noise=round(mean(noises), 4),
+            noise=round(average_noise, 4),
             noise_1=round(noise_1, 4) if noise_1 is not None else None,
             noise_2=round(noise_2, 4) if noise_2 is not None else None,
             noise_3=round(noise_3, 4) if noise_3 is not None else None,
