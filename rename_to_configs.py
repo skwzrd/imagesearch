@@ -25,11 +25,7 @@ class CONSTS:
 
     # general
     max_files_to_process = 0 # 0 == all files
-    db_batch_size = 100
 
-    ## The db queue and ProcessPoolExecutor we have are really slow, bottlenecking at 100it/s
-    ## Set this to 0, or 1 to avoid it
-    max_workers = 6
 
     # web
     UPLOAD_FOLDER = '/home/USER/Documents/code/clip/static/uploads'

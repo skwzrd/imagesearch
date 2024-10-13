@@ -1,13 +1,10 @@
 import os
 import pickle
 import sqlite3
-import sys
 from collections import OrderedDict
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
-from multiprocessing import Manager, Process, Queue, set_start_method
+from multiprocessing import set_start_method
 from pathlib import Path
-from queue import Empty
 from sqlite3 import Cursor
 from typing import Dict, Generator, List
 
@@ -248,106 +245,35 @@ class ImageProcessor:
         return image_id, fs_img, features
 
 
-def db_writer(write_queue: Queue, db_path: str, db_batch_size: int = 50, timeout: int = 5):
-    """Put `None` into `write_queue` to complete process."""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    batch = []
-
-    with tqdm.tqdm(total=db_batch_size, desc="write queue", position=1, leave=False) as pbar:
-        while True:
-            try:
-                task = write_queue.get(timeout=timeout)  # raises Empty after timeout
-                if task is None:
-                    break  # exit signal received
-
-                batch.append(task)
-                pbar.update(1)
-
-                if len(batch) >= db_batch_size:
-                    for image_id, fs_img, features in batch:
-                        store_features_in_db(cursor, image_id, fs_img, features)
-                        pbar.update(-1)
-                    conn.commit()
-                    batch.clear()
-                    pbar.reset()
-
-            except Empty:
-                if batch:
-                    for image_id, fs_img, features in batch:
-                        store_features_in_db(cursor, image_id, fs_img, features)
-                        pbar.update(-1)
-                    conn.commit()
-                    batch.clear()
-                    pbar.reset()
-
-    # commits any remaining data in the batch
-    if batch:
-        for image_id, fs_img, features in batch:
-            store_features_in_db(cursor, image_id, fs_img, features)
-            pbar.update(-1)
-        conn.commit()
-    batch.clear()
-    pbar.reset()
-    cursor.close()
-    conn.close()
-    print('\nAll records saved.')
-
-
-def process_image_worker_single(image_path: str, processor: ImageProcessor, cursor: Cursor):
-    result = processor.process_image(image_path)
-    if result:
-        image_id, fs_img, features = result
-        store_features_in_db(cursor, image_id, fs_img, features)
-
-
-def process_image_worker_multi(image_path: str, processor: ImageProcessor, write_queue: Queue):
-    result = processor.process_image(image_path)
-    if result:
-        image_id, fs_img, features = result
-        write_queue.put((image_id, fs_img, features))
-
-
 def load_images_and_store_in_db(root_image_folder: str, image_processor: ImageProcessor):
     file_paths = get_image_paths(root_image_folder)
     files_found = count_image_files(root_image_folder)
     max_files_to_process = min(files_found, CONSTS.max_files_to_process) if CONSTS.max_files_to_process else files_found
 
-    if CONSTS.max_workers < 2:
-        conn = sqlite3.connect(CONSTS.db_path, autocommit=True)
-        cursor = conn.cursor()
-        for path in tqdm.tqdm(file_paths, total=max_files_to_process, desc='progress'):
-            process_image_worker_single(path, image_processor, cursor)
-    else:
-        manager = Manager()
-        write_queue = manager.Queue() # share queue across processes
+    conn = sqlite3.connect(CONSTS.db_path)
+    cursor = conn.cursor()
+    batch_commit = 100
+    batch_commit_i = 0
 
-        db_process = Process(target=db_writer, args=(write_queue, CONSTS.db_path, CONSTS.db_batch_size))
-        db_process.start()
-        error_occurred = False
-        with ProcessPoolExecutor(max_workers=CONSTS.max_workers) as executor:
-            futures = []
-            for path in file_paths:
-                if len(futures) < max_files_to_process:
-                    futures.append(executor.submit(process_image_worker_multi, path, image_processor, write_queue))
+    try:
+        for i, path in tqdm.tqdm(enumerate(file_paths), total=max_files_to_process, desc='progress'):
+            if i >= max_files_to_process:
+                break
 
-            with tqdm.tqdm(total=len(futures), position=0, desc='process queue') as pbar:
-                for future in as_completed(futures):
-                    try:
-                        future.result()
-                    except Exception as e:
-                        print(f"Error in future: {e}")
-                        error_occurred = True
-                        break
-                    finally:
-                        pbar.update(1)
-        if error_occurred:
-            executor.shutdown(wait=False)
-            print("Shutting down due to an error...")
+            result = image_processor.process_image(path)
+            if result:
+                image_id, fs_img, features = result
+                store_features_in_db(cursor, image_id, fs_img, features)
 
-        write_queue.put(None) # signal db_writer to terminate
-        db_process.join()
+            if batch_commit_i > batch_commit:
+                conn.commit()
+                batch_commit_i = 0
+
+            batch_commit_i += 1
+    finally:
+        conn.commit()
+        cursor.close()
+        conn.close()
 
 
 def insert_feature(cursor: Cursor, image_id: int, table_name: str, feature_data: dict):
